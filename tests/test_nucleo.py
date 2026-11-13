@@ -1,0 +1,177 @@
+"""Modelo de entrada, soluções analíticas, invariantes físicos e NBR 6118."""
+import math
+
+import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
+from pydantic import ValidationError
+
+from core.concreto import criar_concreto
+from core.fases import calcular, travamento_minimo_exato
+from core.models import Entrada
+
+
+# ------------------------------------------------------------------ modelo
+def test_padrao_e_o_exemplo_da_planilha():
+    e = Entrada()
+    assert (e.H_muro, e.b_talao, e.phi_at, e.FSt_min) == (4.0, 1.85, 30.0, 2.0)
+    assert e.delta_dv is None and e.resolvida().delta_dv == 30.0
+    assert e.resolvida().gw_f == e.gf_f
+
+
+def test_ida_e_volta_formato_planilha_e_json():
+    e = Entrada(cf_usar=True, metodo_emp="Rankine", hw_at=1.5, cf_peso=True)
+    p = e.para_planilha()
+    assert p["cf_usar"] == "Sim" and p["anc_usar"] == "Não" and p["cf_peso"] == "Sim"
+    assert Entrada.da_planilha(p) == e.resolvida()
+    assert Entrada(**e.model_dump(mode="json")) == e
+
+
+@pytest.mark.parametrize("mud", [dict(h_sap=5.0), dict(beta_t=35), dict(phi_at=0), dict(metodo_emp="Bishop"),
+                                 dict(H_muro=-1), dict(campo_inexistente=1)])
+def test_entradas_invalidas_sao_recusadas(mud):
+    with pytest.raises(ValidationError):
+        Entrada(**mud)
+
+
+def test_opcoes_legadas_sao_sinalizadas():
+    assert Entrada().opcoes_legadas_ativas() == []
+    e = Entrada(peso_na="Submerso (GEO5)", bef_desl="Como GEO5", xd_lim="0,259 (GEO5)")
+    assert len(e.opcoes_legadas_ativas()) == 3
+
+
+# ------------------------------------------------------- soluções analíticas
+def test_rankine_fechado_dorso_virtual():
+    """c = 0, β = 0, dorso virtual vertical: Pa = Ka·γ·H²/2 + Ka·q·H, aplicado conforme o diagrama."""
+    e = Entrada(metodo_emp="Rankine", modo_cunha="Vertical")
+    r = calcular(e)
+    Ka = math.tan(math.radians(45 - e.phi_at / 2)) ** 2
+    H = e.H_muro
+    Ps, Pq = Ka * e.gam_at * H**2 / 2, Ka * e.q_sc * H
+    emp = r.fase1.emp
+    assert emp.p_Pah == pytest.approx(Ps + Pq, rel=1e-12)
+    assert emp.p_Pav == pytest.approx(0, abs=1e-12)
+    # braço de alavanca: regra do ponto médio (40 + 20 fatias) → erro ~2e-4
+    assert emp.p_zPa == pytest.approx((Ps * H / 3 + Pq * H / 2) / (Ps + Pq), rel=5e-4)
+    fino = calcular(e, fatias=(4000, 1, 2000)).fase1.emp.p_zPa
+    assert fino == pytest.approx((Ps * H / 3 + Pq * H / 2) / (Ps + Pq), rel=1e-7)
+
+
+def test_repouso_na_fase_2():
+    e = Entrada(trav_usar=True, modo_cunha="Vertical")
+    emp = calcular(e).fase2.emp
+    K0 = 1 - math.sin(math.radians(e.phi_at))
+    assert emp.p_Pah == pytest.approx(K0 * (e.gam_at * e.H_muro**2 / 2 + e.q_sc * e.H_muro), rel=1e-12)
+    assert emp.p_Pav == 0
+
+
+def test_hidrostatica_e_subpressao():
+    e = Entrada(hw_at=2.0, hw_fr=1.0)
+    emp = calcular(e).fase1.emp
+    assert emp.p_U == pytest.approx(0.5 * 10 * 2.0**2)
+    assert emp.p_Usub == pytest.approx((10 * 1.0 + 10 * 2.0) / 2 * 3.0)
+
+
+def test_convergencia_da_integracao():
+    e = Entrada(c_at=8, beta_t=10, metodo_emp="Rankine", hw_at=1.5)
+    a = calcular(e).fase1.emp.p_Pah
+    b = calcular(e, fatias=(400, 400, 200)).fase1.emp.p_Pah
+    assert a == pytest.approx(b, rel=5e-3)
+
+
+def test_vesic_fatores():
+    cap = calcular(Entrada(phi_f=30)).fase1.verif.cap
+    assert cap.CC_Nq == pytest.approx(18.40, abs=0.01)
+    assert cap.CC_Nc == pytest.approx(30.14, abs=0.01)
+    assert cap.CC_Ng == pytest.approx(22.40, abs=0.01)
+
+
+def test_equilibrio_das_tensoes_na_base():
+    v = calcular(Entrada()).fase1
+    B = 3.0
+    assert (v.verif.sig_max + v.verif.sig_min) / 2 * B == pytest.approx(v.forcas.F_N)
+    assert v.verif.R_sef * v.verif.R_Bef == pytest.approx(v.forcas.F_N)
+
+
+# ---------------------------------------------------------------- travamento
+def test_travamento_minimo_exato_atende_os_fs():
+    e = Entrada(trav_usar=True, k_c=0.5)
+    t = travamento_minimo_exato(e)
+    v = t.resultado.fase2.verif
+    assert v.R_FSt >= e.FSt_min - 1e-6 and v.R_FSd >= e.FSd_min - 1e-3
+    pouco_menos = calcular(e.com(trav_F=t.F_min - 0.05)).fase2.verif
+    assert pouco_menos.R_FSd < e.FSd_min or pouco_menos.R_FSt < e.FSt_min
+
+
+def test_travamento_exato_coincide_com_a_planilha_sem_adesao():
+    """Sem adesão (kc = 0) B' não entra na resistência e a estimativa da planilha é exata."""
+    e = Entrada(trav_usar=True)
+    est = calcular(e).trav.TR_Fd
+    assert travamento_minimo_exato(e).F_desl == pytest.approx(est, abs=2e-3)
+
+
+# ---------------------------------------------------------------- invariantes
+muros = st.fixed_dictionaries(dict(
+    H_muro=st.floats(2.0, 7.0), b_talao=st.floats(0.0, 4.0), b_ponta=st.floats(0.0, 2.0),
+    q_sc=st.floats(0, 40), phi_at=st.floats(22, 40), c_at=st.floats(0, 15), beta_t=st.floats(0, 20),
+    hw_at=st.floats(0, 2.0), metodo_emp=st.sampled_from(["Rankine", "Coulomb"]),
+    modo_cunha=st.sampled_from(["Inclinada (GEO5)", "Vertical"])))
+
+
+@settings(max_examples=150, deadline=None)
+@given(muros)
+def test_invariantes_fisicos(d):
+    e = Entrada(**d)
+    r = calcular(e)
+    f, v = r.fase1, r.fase1.verif
+    assert f.emp.p_Pah >= 0 and f.emp.p_Pa >= f.emp.p_Pah - 1e-9
+    assert 0 <= v.R_Bef <= r.geo.B_base + 1e-12
+    assert v.sig_min >= 0 and v.sig_max >= v.sig_min
+    assert f.forcas.F_Movr >= 0
+    assert 0 <= v.cap.CC_iq <= 1 and 0 <= v.cap.CC_ig <= 1
+    # mais sobrecarga nunca reduz o empuxo horizontal
+    mais_q = calcular(e.com(q_sc=e.q_sc + 10)).fase1.emp.p_Pah
+    assert mais_q >= f.emp.p_Pah - 1e-9
+    # refinamento da malha não muda o resultado de forma relevante
+    fino = calcular(e, fatias=(200, 200, 100)).fase1.emp.p_Pah
+    assert fino == pytest.approx(f.emp.p_Pah, rel=0.02, abs=0.05)
+
+
+# ------------------------------------------------------------------ NBR 6118
+def test_concreto_ate_c40_igual_a_planilha():
+    c = criar_concreto(25, 500, 1.4, 1.15)
+    assert (c.k_bloco, c.k_meio, c.lam, c.rho_min) == (0.68, 0.425, 0.8, 0.0015)
+    assert c.fctm == pytest.approx(0.3 * 25 ** (2 / 3))
+    assert not c.desvio_planilha
+
+
+def test_as_necessaria_fecha_o_equilibrio():
+    c = criar_concreto(30, 500, 1.4, 1.15)
+    As = c.as_nec(120.0, 0.30)
+    assert c.mrd(As, 0.30) == pytest.approx(120.0, rel=1e-9)
+    assert c.as_nec(0, 0.3) == 0 and c.as_nec(1e6, 0.3) == -1
+
+
+@pytest.mark.parametrize("fck,rho", [(20, 0.0015), (30, 0.0015), (35, 0.00164), (40, 0.00179), (45, 0.00194),
+                                     (50, 0.00208), (60, 0.00219), (90, 0.00256)])
+def test_rho_min_tabela_17_3(fck, rho):
+    assert criar_concreto(fck, 500, 1.4, 1.15).rho_min == rho
+
+
+def test_fck_acima_de_40_segue_a_nbr_e_nao_a_planilha():
+    c45, c70 = criar_concreto(45, 500, 1.4, 1.15), criar_concreto(70, 500, 1.4, 1.15)
+    assert c45.desvio_planilha and c45.k_bloco == pytest.approx(0.68 * (40 / 45) ** (1 / 3))
+    assert c70.lam == pytest.approx(0.75) and c70.xd_lim_nbr == 0.35
+    assert c70.fctm == pytest.approx(2.12 * math.log(1 + 0.11 * 70))
+    # menos resistência que a fórmula da planilha → mais armadura
+    planilha = 0.68 * (45 / 1.4) * 1000 * 1.25 * (0.3 - math.sqrt(0.3**2 - 150 / (0.425 * 45 / 1.4 * 1000))) \
+        / (500 / 1.15 * 1000) * 10000
+    assert c45.as_nec(150, 0.3) > planilha
+    assert any("fck" in n for n in calcular(Entrada(fck_c=45)).dim.notas)
+
+
+def test_verificacao_extra_do_cortante_no_talao():
+    r = calcular(Entrada())
+    extra = r.dim.extras[0]
+    assert "Talão" in extra.nome and extra.extra and extra.situacao in ("OK", "NÃO OK")
+    assert extra.solicitante == pytest.approx(r.dim.v["dm_VSd_tl"])

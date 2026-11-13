@@ -1,0 +1,15 @@
+# ambiente e caches
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.hypothesis/
+
+# configuração local do Claude (preview com caminhos do Windows)
+.claude/
+
+# outro projeto que divide esta pasta — não faz parte deste repositório
+site/
+
+# arquivos temporários do Excel
+~$*
