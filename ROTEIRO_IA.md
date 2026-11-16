@@ -5,7 +5,7 @@ Leia-o inteiro antes de mexer em qualquer coisa. O estado técnico detalhado est
 [README.md](README.md); o plano original, em [PLANEJAMENTO.md](PLANEJAMENTO.md) (histórico — não é
 mais a referência).
 
-Situação em 16/11/2026: aplicativo completo e funcionando, **190 testes passando**.
+Situação em 16/11/2026: aplicativo completo e funcionando, **192 testes passando**.
 
 ---
 
@@ -74,7 +74,7 @@ core/             campos.py (GERADO) · enums.py · models.py · geometria.py ·
 ui/               estado.py · inputs.py · painel.py · graficos.py · armacao.py · estudo_solo.py · formato.py
 io_/              projeto.py (JSON) · excel.py · memorial.py (PDF) · sondagem.py (leitura do PDF de SPT)
 tools/            gerar_campos.py · gerar_cenarios.py
-tests/            9 arquivos, 190 testes; tests/data/cenarios.json é a referência do Excel
+tests/            9 arquivos, 192 testes; tests/data/cenarios.json é a referência do Excel
 ```
 
 Cadeia de cálculo (funções puras, sem iteração):
@@ -192,6 +192,15 @@ GEO5 46,01 (γf só no empuxo, excentricidade recalculada, sem descontar a ancor
 70,75 (γf em toda a reação de serviço). MRd da haste com x/d = 0,28: GEO5 64,36 × aplicativo 64,67
 (+0,5 %, único ponto em que o aplicativo fica acima); na ponta, com x/d < 0,259, os dois coincidem.
 
+Terceiro caso (16/11/2026, mesmo arquivo): muro com contrafortes na frente e ancoragem. Estabilidade
+reproduzida. Atenção: o "espaçamento l" do GEO5 é o **vão livre**; o `cf_esp` do aplicativo é entre
+eixos (l + espessura). Cortina: mesmas fórmulas, aplicativo ~4 % acima (o GEO5 não majora a sobrecarga).
+Contraforte: aplicativo 40 % acima (o GEO5 usa coeficiente 1,0). As mín do GEO5 = 0,15 %·b·d (aplicativo:
+b·h). **Base entre contrafortes: aplicativo 17 % ABAIXO do GEO5** (224 × 269 kPa) — o GEO5 majora só o
+empuxo, com pesos e ancoragem em 1,0; o aplicativo multiplica tudo por γf e a excentricidade fica menor.
+É a mesma causa do cortante da ponta (pendência 2). Correção proposta e ainda não decidida: envoltória
+com a combinação de ações favoráveis em 1,0 (NBR 8681).
+
 Diferenças que permanecem, com o aplicativo a favor da segurança salvo indicação:
 
 - momento resistente da cortina: 100,5 × 101,75 kN·m/m. Hipótese **não confirmada**: o GEO5 soma a
@@ -223,7 +232,7 @@ Proponha antes de fazer; a decisão é do projetista.
    ou **entrada/saída** (`io_/`).
 2. Se envolver a planilha, releia as células envolvidas com `openpyxl` (fórmulas e valores) antes
    de escrever código.
-3. Rode `pytest` antes de começar, para confirmar os 190 testes verdes.
+3. Rode `pytest` antes de começar, para confirmar os 192 testes verdes.
 4. Faça a mudança no núcleo primeiro, com teste; só depois a interface.
 5. Se o resultado passar a diferir da planilha, pare e classifique: erro de porte (corrija) ou
    desvio deliberado (registre em `premissas.py`, no README e como exceção nomeada na paridade).

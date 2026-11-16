@@ -158,3 +158,64 @@ def test_ancoragem_nao_alivia_a_ponta():
     # com o dobro da adesão a reação do solo aumenta; os esforços da ponta não podem diminuir
     M2, V2 = ponta(anc_a=40)
     assert M2 >= M and V2 >= V
+
+
+# ---------------------------------------------------------------------------------------------------
+# Terceiro caso de referência: memorial do GEO5 de 16/11/2026, muro com contrafortes na frente.
+# Cortina 0,20 × 3,00 m, sapata 1,00 × 0,20 m (ponta de 0,80 m, sem talão), contrafortes de 0,40 × 0,80 m
+# com vão livre de 2,25 m (o "espaçamento l" do GEO5 é o vão livre: entre eixos são 2,65 m), estacas de
+# 0,40 m × 8 m a cada 3 m em x = 0,50 m, C20, Rd = 150 kPa.
+MURO_CF = dict(H_muro=3.20, h_sap=0.20, t_topo=0.2, t_base=0.2, b_ponta=0.8, b_talao=0.0, D_frente=0.6,
+               solo_ponta=True, q_sc=10, gam_at=20, gsat_at=20, phi_at=30, c_at=5, delta_est=10, gam_f=20,
+               gsat_f=20, phi_f=30, c_f=5, fck_c=20, cf_usar=True, cf_tipo="Na frente (sobre a ponta)",
+               cf_peso=False, cf_esp=2.65, cf_t=0.40, cf_h=3.0, cf_Lb=0.8, cf_Lt=0.8, cf_n=5, cf_phi=20,
+               ar_tz_phi=12.5, ar_tz_s=12.0, ar_fr_phi=10, ar_fr_s=20, ar_hz_tz_phi=8, ar_hz_tz_s=300 / 19,
+               ar_hz_fr_phi=8, ar_hz_fr_s=300 / 19, ar_bl_i_phi=12.5, ar_bl_i_s=12.0, ar_bl_s_phi=12.5,
+               ar_bl_s_s=12.0, anc_usar=True, anc_x=0.5, anc_n1=1, anc_n2=0, anc_L=8, anc_d=0.4, anc_esp=3.0,
+               anc_a=20, anc_FS=1.5, anc_ds=25, anc_fy=500)
+CRITERIOS_CF = {**CRITERIOS_GEO5, "FSt_min": 2.0, "FSd_min": 1.5, "qult_inf": 150,
+                "laje_cf": "Coeficientes do GEO5 (planilha)"}
+
+
+@pytest.fixture(scope="module")
+def geo5_cf():
+    return calcular(Entrada(**MURO_CF, **CRITERIOS_CF))
+
+
+def test_contrafortes_estabilidade(geo5_cf):
+    emp, F, v = geo5_cf.fase1.emp, geo5_cf.fase1.forcas, geo5_cf.fase1.verif
+    assert emp.p_Pah_s == pytest.approx(16.71, abs=0.01)
+    assert emp.p_Pah_q == pytest.approx(7.88, abs=0.01)
+    assert emp.p_Pav == pytest.approx(2.95 + 1.71, abs=0.01)
+    assert F.anc.anc_Tp == pytest.approx(134.04, abs=0.01)
+    assert F.F_N == pytest.approx(75.75, abs=0.02)               # peso dos contrafortes fora, como no GEO5
+    assert F.F_Mres == pytest.approx(45.56, abs=0.02)
+    assert F.F_Movr == pytest.approx(22.97, abs=0.02)
+    assert v.R_FSt == pytest.approx(1.98, abs=0.006)
+    assert v.R_Hres == pytest.approx(46.72, abs=0.02)
+    assert v.R_Hact == pytest.approx(22.80, abs=0.01)
+    assert v.R_FSd == pytest.approx(2.05, abs=0.006)
+    assert v.R_eB == pytest.approx(0.202, abs=0.0006)
+    assert v.R_sef == pytest.approx(127.03, abs=0.1)
+    assert v.R_FScc == pytest.approx(1.18, abs=0.006)
+    assert not v.ok_tomb and v.ok_desl and v.ok_exc and not v.ok_cap   # mesmo veredito do GEO5
+
+
+def test_contrafortes_dimensionamento(geo5_cf):
+    d = geo5_cf.dim.v
+    assert d["cs_l"] == pytest.approx(2.25)
+    assert d["cs_MRht"] == pytest.approx(66.56 / 3.0, rel=0.001)   # GEO5 dá o total em 3,00 m de altura
+    assert d["cf_MRd"] == pytest.approx(607.62, rel=0.001)
+    assert d["cf_VRd"] == pytest.approx(254.59, rel=0.001)
+    assert d["bd_Ai"] * 100 == pytest.approx(818.5 / 0.8, rel=0.001)
+    # cortina: mesmas fórmulas; o GEO5 não majora a parcela da sobrecarga (49,80 × 51,80 kPa na base)
+    assert d["cs_sH"] == pytest.approx(49.80 + 0.4 * 5.0, rel=0.001)
+    for chave, geo in (("cs_Mvt", 10.07), ("cs_Mvf", 2.52), ("cs_Mht", 34.68 / 3), ("cs_Mhf", 20.81 / 3),
+                       ("cs_V", 30.83)):
+        assert geo < d[chave] < 1.08 * geo, chave
+    # contraforte: o GEO5 usa coeficiente 1,0 nas ações; o aplicativo aplica γf
+    assert d["cf_MSd"] == pytest.approx(1.4 * 178.40, rel=0.003)
+    assert d["cf_VSd"] == pytest.approx(1.4 * 156.78, rel=0.006)
+    # base entre contrafortes — diferença CONTRA a segurança, pendente de decisão: o GEO5 majora só o
+    # empuxo (pesos e ancoragem com 1,0), a excentricidade cresce e a tensão sobe para 269,24 kPa
+    assert d["bd_s"] == pytest.approx(224.08, abs=0.05) and d["bd_s"] < 269.24

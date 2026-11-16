@@ -68,7 +68,7 @@ core/                   BACKEND — não importa streamlit
 ui/                     inputs · painel · graficos · armacao (desenho das armaduras) · estudo_solo · estado
 io_/                    projeto (JSON) · excel (importar/exportar) · memorial (PDF) · sondagem (ler PDF)
 tools/                  gerar_campos.py · gerar_cenarios.py
-tests/                  190 testes
+tests/                  192 testes
 ROTEIRO_IA.md           contexto, decisões e pendências para quem (ou qual IA) for continuar o projeto
 ```
 
