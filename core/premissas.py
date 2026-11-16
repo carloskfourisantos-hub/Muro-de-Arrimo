@@ -73,10 +73,18 @@ PREMISSAS: dict[str, list[str]] = {
         "livre (placa por elementos finitos, momentos nas duas direções) e contraforte como viga em balanço. "
         "Opção legada: coeficientes do GEO5 (M vertical = 0,03·σH·H1·l; M horizontal = σp·l²/12 nos apoios e "
         "σp·l²/20 no vão; V = σp·l/2).",
-        "Base (ponta, talão e laje entre contrafortes na frente): envoltória de duas combinações — γf × esforços "
-        "de serviço, e ações favoráveis em 1,0 (NBR 8681: só o empuxo e a água recebem γf; pesos, ancoragem e "
-        "resistências com 1,0; solo sobre a ponta com o fator informado, limitado a 1,0). Na segunda a "
-        "excentricidade de cálculo é maior; se a resultante de cálculo sair da base, o dimensionamento reprova.",
+        "Base (ponta, talão e laje entre contrafortes na frente): pior caso de todas as combinações em que cada "
+        "grupo de ações — empuxo; pesos, ancoragem e resistências; água — entra com 1,0 ou com γf (NBR 8681), "
+        "com a reação do solo obtida do equilíbrio de cada combinação. Somam-se as combinações locais com a "
+        "reação do solo de serviço × 1,0 ou γf contra os pesos e o empuxo vertical × 1,0 ou γf. 'γf × esforços de "
+        "serviço' (planilha) é uma delas. Se em alguma a resultante de cálculo sair da base, reprova.",
+        "As combinações locais não são equilibradas (ex.: pesos × γf contra reação × 1,0) e costumam governar o "
+        "talão; são o critério mais severo, pedido pelo projetista em 16/11/2026.",
+        "Equilíbrio do nó cortina-sapata (modo 'Máximo' do momento na ponta): a ponta é armada para, no mínimo, o "
+        "momento de cálculo da base da cortina menos o momento para o qual o talão é armado. Sem talão, recebe o "
+        "momento inteiro da cortina. Não se aplica à base entre contrafortes.",
+        "Faces opostas: quando alguma combinação traciona a face inferior do talão ou a superior da ponta, a "
+        "armadura dessa face também é verificada.",
         "Critérios a favor da segurança em relação ao GEO5: momento resistente sem a força normal nem a "
         "armadura comprimida; cortante da ponta com γf aplicado a toda a reação do solo.",
     ],
@@ -117,9 +125,11 @@ DIFERENCAS_DA_PLANILHA: list[str] = [
     "distribuição triangular de tensões (descolamento parcial), tiver armadura e cortante suficientes e a área "
     "comprimida for ≥ 2/3 (NBR 6122 7.6.2).",
     "Cargas em faixa, em linha e concentrada no terrapleno (Boussinesq): não existem na planilha.",
-    "Dimensionamento da base: a planilha usa só γf × esforços de serviço; o aplicativo adota a envoltória com a "
-    "combinação de ações favoráveis em 1,0 (NBR 8681, critério do GEO5), que governa quando a excentricidade é "
-    "alta. Os esforços nunca ficam abaixo dos da planilha.",
+    "Dimensionamento da base: a planilha usa só γf × esforços de serviço; o aplicativo adota o pior caso de "
+    "todas as combinações de 1,0 e γf por grupo de ações (NBR 8681), incluindo a reação do solo de serviço sem "
+    "majorar. Os esforços nunca ficam abaixo dos da planilha e o talão costuma ficar bem acima.",
+    "Momento da ponta com talão (modo 'Máximo'): além das pressões na base, vale o equilíbrio do nó — momento "
+    "da cortina menos o do talão. A planilha só leva o momento da cortina à ponta quando não há talão.",
     "Ancoragem na base sob a ponta: a força das estacas não é descontada do momento nem do cortante da ponta "
     "(a planilha desconta). É resistência passiva, mobilizada por inteiro só na ruptura; o GEO5 também não a "
     "desconta. Os esforços da ponta ficam maiores.",

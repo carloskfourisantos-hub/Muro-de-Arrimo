@@ -68,7 +68,7 @@ core/                   BACKEND — não importa streamlit
 ui/                     inputs · painel · graficos · armacao (desenho das armaduras) · estudo_solo · estado
 io_/                    projeto (JSON) · excel (importar/exportar) · memorial (PDF) · sondagem (ler PDF)
 tools/                  gerar_campos.py · gerar_cenarios.py
-tests/                  197 testes
+tests/                  199 testes
 ROTEIRO_IA.md           contexto, decisões e pendências para quem (ou qual IA) for continuar o projeto
 ```
 
@@ -127,9 +127,12 @@ print(r.fase1.verif.R_FSt, r.fase1.verif.R_FSd, r.atende_estabilidade, r.dim.ate
 - **Cargas em faixa, em linha e concentrada** no terrapleno (`core/boussinesq.py`): pressões de
   Boussinesq na forma de Terzaghi/NAVFAC, com opção de parede rígida (×2, padrão) ou que se desloca.
   Nove campos só do aplicativo (`sc_fx_*`, `sc_ln_*`, `sc_pt_*`, `sc_bq`). Não existem na planilha.
-- **Dimensionamento da base**: envoltória de γf × esforços de serviço (planilha) com a combinação de
-  ações favoráveis em 1,0 (NBR 8681: só o empuxo e a água com γf), que é a do GEO5. Vale para ponta,
-  talão, base entre contrafortes na frente e para a verificação com descolamento.
+- **Dimensionamento da base**: pior caso de todas as combinações em que cada grupo de ações (empuxo;
+  pesos, ancoragem e resistências; água) entra com 1,0 ou γf (NBR 8681), mais as combinações locais com a
+  reação do solo de serviço × 1,0 ou γf. Vale para ponta, talão, base entre contrafortes na frente e para
+  a verificação com descolamento. A planilha usa só γf × esforços de serviço.
+- **Equilíbrio do nó cortina-sapata**: no modo "Máximo", o momento da ponta é no mínimo o da cortina menos
+  o do talão (a planilha só faz isso quando não há talão).
 - **Ancoragem sob a ponta**: a força das estacas não é descontada do momento nem do cortante da
   ponta (a planilha desconta). É resistência passiva, mobilizada por inteiro só na ruptura; o GEO5
   também não a desconta.

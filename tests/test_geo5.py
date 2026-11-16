@@ -143,8 +143,9 @@ def test_ancoragem_dimensionamento(geo5_anc):
     # diferenças conhecidas:
     assert d["dm_MRdp"] == pytest.approx(64.36, rel=0.006)        # haste com x/d = 0,28 > 0,259: GEO5 0,5 % menor
     # cortante do avanço: nenhum dos dois desconta a ancoragem. GEO5 = 46,01 (γf só no empuxo, excentricidade
-    # recalculada); aplicativo = γf em toda a reação de serviço, mais conservador.
-    assert d["dm_VSd_pt"] == pytest.approx(70.75, abs=0.05) and d["dm_VSd_pt"] > 46.01
+    # recalculada); o aplicativo adota o pior caso das combinações (reação × γf contra o peso × 1,0).
+    assert d["dm_VSd_pt_fav"] == pytest.approx(46.01, rel=0.02)
+    assert d["dm_VSd_pt"] == pytest.approx(71.95, abs=0.05) and d["dm_VSd_pt"] > 46.01
 
 
 def test_ancoragem_nao_alivia_a_ponta():
@@ -154,7 +155,7 @@ def test_ancoragem_nao_alivia_a_ponta():
         d = calcular(Entrada(**{**base, **mud})).dim.v
         return d["dm_MtP1"], d["dm_VtP"]
     M, V = ponta()
-    assert V == pytest.approx(70.75 / 1.4, abs=0.05)
+    assert V == pytest.approx(70.75 / 1.4, abs=0.05)                 # serviço
     # com o dobro da adesão a reação do solo aumenta; os esforços da ponta não podem diminuir
     M2, V2 = ponta(anc_a=40)
     assert M2 >= M and V2 >= V
@@ -283,10 +284,12 @@ def test_talao_cunha_inclinada_dimensionamento(geo5_talao):
     # cortante do avanço: a combinação de ações favoráveis reproduz o GEO5; o aplicativo adota a envoltória
     assert d["dm_VSd_pt_fav"] == pytest.approx(59.05, rel=0.035) and d["dm_VSd_pt"] >= 59.05
     # Momento do avanço: o GEO5 usa o equilíbrio do nó, haste − dente = 94,35 − 26,68 = 67,68 kN·m/m
-    # (confirmado com a página do dente). O aplicativo, pelas pressões na base, dá 30,9; ajuste pendente de
-    # decisão do projetista. Com 'Igual à cortina (GEO5)' o aplicativo usa o momento da haste (94,5).
+    # (confirmado com a página do dente). Pelas pressões na base o aplicativo dá 31,8; no modo 'Máximo'
+    # aplica o equilíbrio do nó com o talão dele (ver tests/test_nucleo.py) e fica acima do GEO5.
     assert 94.35 - 26.68 == pytest.approx(67.68, abs=0.015)
-    assert d["dm_MSd_pt"] == pytest.approx(30.86, abs=0.05)
+    assert d["dm_MSd_pt"] == pytest.approx(31.82, abs=0.05)
+    maximo = calcular(Entrada(**MURO_TALAO, **{**CRITERIOS_TALAO, "ponta_mod": "Máximo"})).dim.v
+    assert maximo["dm_MSd_pt"] == pytest.approx(78.56, abs=0.1) and maximo["dm_MSd_pt"] > 67.68
 
 
 def test_talao_cunha_inclinada_c25_e_dente():
@@ -306,5 +309,9 @@ def test_talao_cunha_inclinada_c25_e_dente():
     assert reacao == pytest.approx(54.33, abs=0.01)
     solo = next(f.Fz for f in F.linhas if f.nome.startswith("Solo sobre o talão (γ"))
     assert 0.8 * 0.3 * 25 + solo + 1.4 * r.fase1.emp.p_Pav - reacao == pytest.approx(21.26, abs=0.01)
-    # o aplicativo dá menos no talão (16,6 kN/m e 11,5 kN·m/m contra 21,26 e 26,68): diferença em aberto
-    assert d["dm_VSd_tl"] < 21.26 and d["dm_MSd_tl"] < 26.68
+    # cortante do talão: o pior caso das combinações cobre o do GEO5. Momento: os 26,68 do GEO5 incluem o
+    # momento do empuxo horizontal no conjunto talão + cunha, que tem sentido contrário ao das cargas verticais
+    # e na prática é levado pela haste; o aplicativo arma o talão para as cargas verticais (15,9) e garante o
+    # equilíbrio do nó pela ponta.
+    assert d["dm_VSd_tl"] == pytest.approx(28.22, abs=0.05) and d["dm_VSd_tl"] > 21.26
+    assert d["dm_MSd_tl"] == pytest.approx(15.90, abs=0.05)

@@ -230,55 +230,93 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
         V = -float((eh_talao * q).sum()) * dx + anc_V_tl + (kpav * emp.p_Pav if pav_on else 0.0)
         return M, V
 
-    # Combinação com as ações favoráveis em 1,0 (NBR 8681): só o empuxo e a água recebem γf; pesos,
-    # ancoragem e resistências ficam com 1,0. A excentricidade de cálculo cresce e a tensão na borda pode
-    # superar γf × tensão de serviço. O dimensionamento da base usa a envoltória das duas combinações.
-    def comb_fav(f):
+    # ------------------------------------------------ combinações de ações para dimensionar a base
+    # Cada grupo de ações (empuxo; pesos, ancoragem e resistências; água) entra com 1,0 ou com γf, em todas
+    # as combinações possíveis (NBR 8681: favorável 1,0, desfavorável γf). A reação do solo sai do equilíbrio
+    # de cada combinação. Além disso, combinações locais com a reação de serviço × 1,0 ou γf contra os pesos
+    # e o empuxo vertical × 1,0 ou γf. O dimensionamento usa o pior caso; "γf × serviço" (planilha) é uma delas.
+    fases_dim = (f1, f2) if trav else (f1,)
+    tem_agua = any(ln.grupo == "agua" and (ln.Fx or ln.Fz) for f in fases_dim for ln in f.forcas.linhas)
+    COMBOS = [(kE, kP, kA) for kE in (1.0, gf) for kP in (1.0, gf) for kA in ((1.0, gw) if tem_agua else (1.0,))]
+    K_FAV = (gf, 1.0, gw if tem_agua else 1.0)        # só empuxo e água majorados (critério do GEO5)
+
+    def comb(f, k):
+        kE, kP, kA = k
         N = M = 0.0
         for ln in f.forcas.linhas:
             if ln.nome.startswith(PREFIXOS_EMPUXO):
-                k = gf
+                kk = kE
             elif ln.grupo == "agua":
-                k = gw if ln.Fx >= 0 else 1.0
+                kk = kA
             elif ln.grupo == "solo_ponta":
-                k = min(e.gf_sp, 1.0)
+                kk = e.gf_sp if kP > 1.0 else min(e.gf_sp, 1.0)
             else:
-                k = 1.0
-            N += k * ln.Fz
-            M += k * (ln.Mres - ln.Movr)
+                kk = kP
+            N += kk * ln.Fz
+            M += kk * (ln.Mres - ln.Movr)
         return N, (B / 2 - M / N if N > 0 else 0.0)
 
-    def q_fav(f, linear=False):
-        """Carga líquida de cálculo na base (kPa) na combinação favorável; None se a resultante sai da base."""
-        N, ex = comb_fav(f)
+    def q_comb(f, k, linear=False):
+        """Carga líquida de cálculo na base (kPa) numa combinação; None se a resultante sai da base."""
+        N, ex = comb(f, k)
         if N <= 0 or abs(ex) >= B / 2:
             return None
         Bef = B - 2 * abs(ex)
         emp = f.emp
-        us = gw * (emp.p_u0 + (emp.p_uB - emp.p_u0) * xb / B) if e.subp == Subpressao.LINEAR else 0.0
-        return _sigma_base(xb, N, ex, Bef, N / Bef, B, ret and not linear) + us - w_sap - carga_tal
+        us = k[2] * (emp.p_u0 + (emp.p_uB - emp.p_u0) * xb / B) if e.subp == Subpressao.LINEAR else 0.0
+        return _sigma_base(xb, N, ex, Bef, N / Bef, B, ret and not linear) + us - k[1] * (w_sap + carga_tal)
 
-    fases_dim = (f1, f2) if trav else (f1,)
     fav_fora = False
-    MB_pt = VB_pt = MB_tl = VB_tl = 0.0
-    for f in fases_dim:
-        qB = q_fav(f)
-        if qB is None:
-            fav_fora = fav_fora or f.forcas.F_N > 0
-            continue
+    MB_pt = VB_pt = MB_tl = VB_tl = 0.0          # envoltória: ponta (tração embaixo) e talão (tração em cima)
+    MN_pt = MN_tl = 0.0                          # sentido contrário: ponta em cima, talão embaixo
+    fav = dict(M_pt=0.0, V_pt=0.0, M_tl=0.0, V_tl=0.0)
+
+    def _acumula(q, emp, kpav, eh_fav=False):
+        nonlocal MB_pt, VB_pt, MB_tl, VB_tl, MN_pt, MN_tl
         if tem_ponta:
-            m, s = ponta(qB)
-            MB_pt, VB_pt = max(MB_pt, m), max(VB_pt, abs(s))
+            m, s = ponta(q)
+            MB_pt, VB_pt, MN_pt = max(MB_pt, m), max(VB_pt, abs(s)), max(MN_pt, -m)
+            if eh_fav:
+                fav.update(M_pt=max(fav["M_pt"], m), V_pt=max(fav["V_pt"], abs(s)))
         if tem_talao:
-            m, s = talao(qB, f.emp, gf)
-            MB_tl, VB_tl = max(MB_tl, m), max(VB_tl, abs(s))
-    Nf1, ef1 = comb_fav(f1)
-    v.update(dm_N_fav=Nf1, dm_e_fav=ef1, dm_MSd_pt_fav=MB_pt, dm_VSd_pt_fav=VB_pt, dm_MSd_tl_fav=MB_tl,
-             dm_VSd_tl_fav=VB_tl)
+            m, s = talao(q, emp, kpav)
+            MB_tl, VB_tl, MN_tl = max(MB_tl, m), max(VB_tl, abs(s)), max(MN_tl, -m)
+            if eh_fav:
+                fav.update(M_tl=max(fav["M_tl"], m), V_tl=max(fav["V_tl"], abs(s)))
+
+    for f, sig_s in zip(fases_dim, (sig1, sig2)):
+        for k in COMBOS:                                     # equilíbrio de cada combinação
+            qk = q_comb(f, k)
+            if qk is None:
+                fav_fora = fav_fora or f.forcas.F_N > 0
+                continue
+            _acumula(qk, f.emp, k[0], k == K_FAV)
+        v.update(dm_MSd_pt_eq=max(v.get('dm_MSd_pt_eq', 0.0), MB_pt), dm_MSd_tl_eq=max(v.get('dm_MSd_tl_eq', 0.0), MB_tl),
+                 dm_VSd_pt_eq=max(v.get('dm_VSd_pt_eq', 0.0), VB_pt), dm_VSd_tl_eq=max(v.get('dm_VSd_tl_eq', 0.0), VB_tl))
+        if f.forcas.F_N > 0 and abs(f.verif.R_e) < B / 2:    # reação de serviço × pesos × empuxo vertical
+            for kR in (1.0, gf):
+                for kW in (1.0, gf):
+                    for kV in (1.0, gf):
+                        _acumula(kR * (sig_s + usub) - kW * (w_sap + carga_tal), f.emp, kV)
+    Nf1, ef1 = comb(f1, K_FAV)
+    v.update(dm_N_fav=Nf1, dm_e_fav=ef1, dm_MSd_pt_fav=fav["M_pt"], dm_VSd_pt_fav=fav["V_pt"],
+             dm_MSd_tl_fav=fav["M_tl"], dm_VSd_tl_fav=fav["V_tl"], dm_MSd_pt_comb=MB_pt, dm_VSd_pt_comb=VB_pt,
+             dm_MSd_tl_comb=MB_tl, dm_VSd_tl_comb=VB_tl, dm_MSd_pt_sup=MN_pt, dm_MSd_tl_inf=MN_tl,
+             dm_n_comb=len(COMBOS) + 8)
 
     MtP1, VtP1 = ponta(q1)
     MtP2, VtP2 = ponta(q2) if trav else (0.0, 0.0)
     VtP = max(abs(VtP1), abs(VtP2) if trav else 0.0)
+    MtT1, VtT1 = talao(q1, emp1) if tem_talao else (0.0, 0.0)
+    MtT2, VtT2 = talao(q2, emp2) if (tem_talao and trav) else (0.0, 0.0)
+    Mtt = max(0.0, MtT1, MtT2)
+    VtT = max(abs(VtT1), abs(VtT2))
+    MSd_tl = max(gf * Mtt, MB_tl)
+    # Equilíbrio do nó cortina-sapata: o momento de cálculo da base da cortina tem de ser absorvido pela
+    # ponta e pelo talão. A ponta recebe o que o talão (com o momento para o qual é armado) não absorve.
+    # Sem talão, a ponta recebe o momento inteiro da cortina (regra da planilha).
+    M_no = max(0.0, float(MSdA[0]) - MSd_tl) if (not tem_talao or not e.cf_usar) else 0.0
+    no_gov = False
     if not tem_ponta:
         Mtp = MSd_pt = 0.0
     elif e.ponta_mod == MomentoPonta.GEO5:
@@ -288,13 +326,11 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
         MSd_pt = max(gf * Mtp, MB_pt)
     else:
         Mtp = max(MtP1, MtP2, MkA[0] if not tem_talao else 0.0)
-        MSd_pt = max(gf * MtP1, gf * MtP2, float(MSdA[0]) if not tem_talao else 0.0, MB_pt)
-    MtT1, VtT1 = talao(q1, emp1) if tem_talao else (0.0, 0.0)
-    MtT2, VtT2 = talao(q2, emp2) if (tem_talao and trav) else (0.0, 0.0)
-    Mtt = max(0.0, MtT1, MtT2)
-    VtT = max(abs(VtT1), abs(VtT2))
+        MSd_pt = max(gf * MtP1, gf * MtP2, MB_pt, M_no)
+        no_gov = tem_talao and M_no > max(gf * MtP1, gf * MtP2, MB_pt) + 1e-9
+    v.update(dm_M_no=M_no, dm_no_gov=no_gov)
     gov_bal = (MB_pt > gf * max(MtP1, MtP2) + 1e-9 or VB_pt > gf * VtP + 1e-9 or MB_tl > gf * Mtt + 1e-9
-               or VB_tl > gf * VtT + 1e-9)
+               or VB_tl > gf * VtT + 1e-9 or no_gov)
     Abi = area_barras(e.ar_bi_phi, e.ar_bi_s)
     Abs_ = area_barras(e.ar_bs_phi, e.ar_bs_s)
     db_i = hs - e.cob_bs / 100 - e.ar_bi_phi / 2000
@@ -302,8 +338,8 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
     Asminb = c.rho_min * 100 * hs * 100
     v.update(dm_Abi=Abi, dm_Abs=Abs_, dm_MtP1=MtP1, dm_MtP2=MtP2, dm_VtP=VtP, dm_Mtp=Mtp, dm_MtT1=MtT1,
              dm_MtT2=MtT2, dm_Mtt=Mtt, dm_db_i=db_i, dm_db_s=db_s, dm_MSd_pt=MSd_pt,
-             dm_As_pt=c.as_nec(MSd_pt, db_i), dm_MRd_pt=c.mrd(Abi, db_i), dm_MSd_tl=max(gf * Mtt, MB_tl),
-             dm_As_tl=c.as_nec(max(gf * Mtt, MB_tl), db_s), dm_MRd_tl=c.mrd(Abs_, db_s), dm_Asminb=Asminb,
+             dm_As_pt=c.as_nec(MSd_pt, db_i), dm_MRd_pt=c.mrd(Abi, db_i), dm_MSd_tl=MSd_tl,
+             dm_As_tl=c.as_nec(MSd_tl, db_s), dm_MRd_tl=c.mrd(Abs_, db_s), dm_Asminb=Asminb,
              dm_VSd_pt=max(gf * VtP, VB_pt), dm_VRd_pt=vrd(Abi, db_i))
 
     # ------------------------------------------- cortina como laje entre contrafortes
@@ -343,10 +379,11 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
     bd_e = B / 2 - bd_M / bd_N if bd_N > 0 else 0.0
     bd_s = tensoes_lineares(bd_N, bd_e, B)[0]
     # envoltória com a combinação de ações favoráveis em 1,0
-    bd_s_fav = max((tensoes_lineares(*comb_fav(f), B)[0] for f in fases_dim), default=0.0)
-    v.update(bd_s_fav=bd_s_fav, bd_s_plan=bd_s)
-    if math.isfinite(bd_s_fav):
-        bd_s = max(bd_s, bd_s_fav)
+    bd_s_fav = max((tensoes_lineares(*comb(f, K_FAV), B)[0] for f in fases_dim), default=0.0)
+    bd_s_comb = max((t for t in (tensoes_lineares(*comb(f, k), B)[0] for f in fases_dim for k in COMBOS)
+                     if math.isfinite(t)), default=0.0)
+    v.update(bd_s_fav=bd_s_fav, bd_s_comb=bd_s_comb, bd_s_plan=bd_s)
+    bd_s = max(bd_s, bd_s_comb)
     bd_qh = gf * ((e.gam_at * g.solo.A + e.q_sc * larg_q) / e.b_talao + e.gam_c * hs) if tem_talao else 0.0
     bd_w = bd_s if frente else bd_qh
     M12, M20, bd_V = bd_w * l**2 / 12, bd_w * l**2 / 20, bd_w * l / 2
@@ -467,6 +504,14 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
         Check("Talão em balanço: VSd ≤ VRd (NBR 6118 19.4.1)", VSd_tl, VRd_tl,
               (_st_max(VSd_tl, VRd_tl) if (tl_on and tem_talao) else NA), Bs, True, "kN/m"),
     ]
+    if MN_tl > 1e-6 and tem_talao and tl_on:
+        as_n = c.as_nec(MN_tl, db_i)
+        extras.append(Check("Talão em balanço — face inferior (peso com 1,0 e reação do solo majorada): "
+                            "As ef ≥ As nec", as_n, Abi, _st_as(as_n, Abi), Bs, True, "cm²/m"))
+    if MN_pt > 1e-6 and tem_ponta and pt_on:
+        as_n = c.as_nec(MN_pt, db_s)
+        extras.append(Check("Ponta em balanço — face superior (peso majorado e reação do solo com 1,0): "
+                            "As ef ≥ As nec", as_n, Abs_, _st_as(as_n, Abs_), Bs, True, "cm²/m"))
     for rot, s_cm, h_m, on in (
         ("Cortina — face do tardoz", e.ar_tz_s, e.t_base, True),
         ("Cortina — face frontal", e.ar_fr_s, e.t_base, True),
@@ -514,9 +559,10 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
             V_ = f.verif
             q_ = _sigma_base(xb, f.forcas.F_N, V_.R_e, V_.R_Bef, V_.R_sef, B, False) + usub - w_sap - carga_tal
             casos = [(q_, 1.0, gf)]                      # serviço × γf
-            qB = q_fav(f, linear=True)                   # favoráveis em 1,0 (já de cálculo)
-            if qB is not None:
-                casos.append((qB, gf, 1.0))
+            for k in COMBOS:                             # combinações 1,0 / γf (já de cálculo)
+                qB = q_comb(f, k, linear=True)
+                if qB is not None:
+                    casos.append((qB, k[0], 1.0))
             for qq, kpav, mult in casos:
                 m, s = ponta(qq) if tem_ponta else (0.0, 0.0)
                 Mp, Vp = (mult * m if abs(mult * m) > abs(Mp) else Mp), max(Vp, abs(mult * s))
@@ -564,9 +610,13 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
             "sem reação do solo, carregado pelo peso do aterro e pelo peso próprio. Acima de B/4 o muro é "
             "reprovado; prefira aumentar a base quando o descolamento ocorrer sob cargas permanentes.")
     if fav_gov:
-        notas.append("Base dimensionada pela combinação com as ações favoráveis em 1,0 (NBR 8681): só o empuxo e a "
-                     "água recebem γf; pesos, ancoragem e resistências ficam com 1,0. A excentricidade de cálculo "
-                     "cresce e os esforços superam γf × os de serviço, que é o critério da planilha.")
+        notas.append(f"Base dimensionada pelo pior caso de {len(COMBOS) + 8} combinações de ações, cada grupo "
+                     "(empuxo; pesos, ancoragem e resistências; água; reação do solo) com 1,0 ou γf (NBR 8681). "
+                     "Os esforços superam γf × os de serviço, que é o critério da planilha.")
+    if no_gov:
+        notas.append("Momento da ponta definido pelo equilíbrio do nó cortina-sapata: momento de cálculo da base da "
+                     "cortina menos o momento para o qual o talão é armado ("
+                     + f"{float(MSdA[0]):.1f} − {MSd_tl:.1f} = {M_no:.1f}".replace(".", ",") + " kN·m/m).")
     if conc is not None and conc.ativo:
         notas.append("Cargas em faixa, em linha e concentrada: pressões pela teoria da elasticidade (Boussinesq, "
                      "na forma de Terzaghi/NAVFAC), horizontais, somadas ao empuxo de terra e majoradas por γf. "

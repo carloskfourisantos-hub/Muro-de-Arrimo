@@ -5,7 +5,7 @@ Leia-o inteiro antes de mexer em qualquer coisa. O estado técnico detalhado est
 [README.md](README.md); o plano original, em [PLANEJAMENTO.md](PLANEJAMENTO.md) (histórico — não é
 mais a referência).
 
-Situação em 16/11/2026: aplicativo completo e funcionando, **197 testes passando**.
+Situação em 16/11/2026: aplicativo completo e funcionando, **199 testes passando**.
 
 ---
 
@@ -39,6 +39,8 @@ concreto armado (ABNT NBR 11682) e dimensionamento estrutural (ABNT NBR 6118), p
 | 16/11/2026 | Excentricidade: limite continua B/6; **entre B/6 e B/4 aceita se a base resistir** à distribuição triangular (descolamento); acima de B/4 reprova |
 | 16/11/2026 | **Cargas em faixa, em linha e concentrada** (Boussinesq/Terzaghi), parede rígida ×2 por padrão; carga pontual pela média num comprimento de muro |
 | 16/11/2026 | Base dimensionada pela **envoltória** de γf × serviço com a combinação de **ações favoráveis em 1,0** (critério do GEO5) |
+| 16/11/2026 | Base pelo **pior caso de todas as combinações de 1,0 e γf** por grupo de ações, incluindo reação de serviço sem majorar (pedido expresso; governa o talão) |
+| 16/11/2026 | **Equilíbrio do nó**: no modo "Máximo" a ponta recebe no mínimo o momento da cortina menos o do talão |
 
 Regra derivada: todo novo desvio em relação à planilha tem de ser (a) registrado em
 `core/premissas.py` (`DIFERENCAS_DA_PLANILHA`), (b) descrito no README e (c) coberto por teste.
@@ -75,7 +77,7 @@ core/             campos.py (GERADO) · enums.py · models.py · geometria.py ·
 ui/               estado.py · inputs.py · painel.py · graficos.py · armacao.py · estudo_solo.py · formato.py
 io_/              projeto.py (JSON) · excel.py · memorial.py (PDF) · sondagem.py (leitura do PDF de SPT)
 tools/            gerar_campos.py · gerar_cenarios.py
-tests/            9 arquivos, 197 testes; tests/data/cenarios.json é a referência do Excel
+tests/            9 arquivos, 199 testes; tests/data/cenarios.json é a referência do Excel
 ```
 
 Cadeia de cálculo (funções puras, sem iteração):
@@ -209,8 +211,10 @@ GEO5), rodado em C20 e em C25. Estabilidade, haste e cortante da ponta reproduzi
 o equilíbrio do nó, avanço = haste − dente = 94,35 − 26,68. O dente do GEO5 (26,68 kN·m/m e 21,26 kN/m)
 usa empuxo × 1,4, pesos × 1,0 e a reação do solo de serviço × 1,0, e soma o momento do empuxo
 horizontal; o cortante foi reproduzido, o momento só com a seção 0,10 m dentro da haste (regra não
-identificada). O aplicativo dá 11,5 e 16,6 no talão. **Ajuste proposto e ainda não decidido**: momento da
-ponta ≥ haste − talão (equilíbrio do nó) e talão com a reação de serviço sem majorar.
+identificada). **Ajustado em 16/11/2026**: equilíbrio do nó na ponta (78,6 neste muro, contra 67,68) e
+talão pelo pior caso das combinações (15,9 kN·m/m e 28,2 kN/m). O momento do empuxo horizontal do "dente"
+do GEO5 NÃO foi copiado: tem sentido contrário ao das cargas verticais e é levado pela haste. Consequência
+das combinações: o exemplo padrão passou a reprovar no talão (8,65 × 8,18 cm²/m).
 
 Diferenças que permanecem, com o aplicativo a favor da segurança salvo indicação:
 
@@ -243,7 +247,7 @@ Proponha antes de fazer; a decisão é do projetista.
    ou **entrada/saída** (`io_/`).
 2. Se envolver a planilha, releia as células envolvidas com `openpyxl` (fórmulas e valores) antes
    de escrever código.
-3. Rode `pytest` antes de começar, para confirmar os 197 testes verdes.
+3. Rode `pytest` antes de começar, para confirmar os 199 testes verdes.
 4. Faça a mudança no núcleo primeiro, com teste; só depois a interface.
 5. Se o resultado passar a diferir da planilha, pare e classifique: erro de porte (corrija) ou
    desvio deliberado (registre em `premissas.py`, no README e como exceção nomeada na paridade).

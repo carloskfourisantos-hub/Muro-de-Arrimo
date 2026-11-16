@@ -351,18 +351,62 @@ def test_cargas_concentradas_na_interface_e_no_memorial():
 def test_base_usa_a_envoltoria_das_duas_combinacoes():
     r = calcular(Entrada(b_talao=0.0, b_ponta=2.2, ponta_mod="Pressões na base"))
     d, gf = r.dim.v, r.entrada.gf_f
-    assert d["dm_fav_gov"] and any("ações favoráveis em 1,0" in n for n in r.dim.notas)
-    assert d["dm_MSd_pt_fav"] > gf * d["dm_MtP1"]                    # a combinação favorável governa
-    assert d["dm_MSd_pt"] == pytest.approx(d["dm_MSd_pt_fav"])
-    assert d["dm_VSd_pt"] == pytest.approx(max(gf * d["dm_VtP"], d["dm_VSd_pt_fav"]))
+    assert d["dm_fav_gov"] and any("combinações de ações" in n for n in r.dim.notas)
+    assert d["dm_MSd_pt_fav"] > gf * d["dm_MtP1"]                    # só o empuxo majorado supera γf × serviço
+    assert d["dm_MSd_pt"] == pytest.approx(d["dm_MSd_pt_comb"]) and d["dm_MSd_pt"] >= d["dm_MSd_pt_fav"]
+    assert d["dm_VSd_pt"] == pytest.approx(max(gf * d["dm_VtP"], d["dm_VSd_pt_comb"]))
     # N e excentricidade de cálculo: só o empuxo com γf
     F = r.fase1.forcas
     emp_v = sum(f.Fz for f in F.linhas if f.nome.startswith("Empuxo —"))
     assert d["dm_N_fav"] == pytest.approx(F.F_N + (gf - 1) * emp_v)
     assert abs(d["dm_e_fav"]) > abs(r.fase1.verif.R_e)               # excentricidade maior que a de serviço
-    # no exemplo padrão quem governa é γf × serviço: nada muda
+    # exemplo padrão: entre as combinações em equilíbrio governa γf × serviço (todas as ações com γf)
     p = calcular(Entrada()).dim.v
-    assert not p["dm_fav_gov"] and p["dm_MSd_tl"] == pytest.approx(gf * p["dm_Mtt"])
+    assert p["dm_MSd_tl_eq"] == pytest.approx(gf * p["dm_Mtt"], rel=1e-6)
+    assert p["dm_MSd_pt_eq"] == pytest.approx(gf * p["dm_MtP1"], rel=1e-6)
+
+
+def test_base_pior_caso_de_todas_as_combinacoes():
+    """Cada grupo de ações com 1,0 ou γf; reação de serviço com 1,0 ou γf; vale o pior caso."""
+    r = calcular(Entrada())
+    d, e, g = r.dim.v, r.entrada, r.geo
+    gf = e.gf_f
+    assert d["dm_n_comb"] == 12                                      # 4 em equilíbrio (sem água) + 8 locais
+    assert calcular(Entrada(hw_at=1.5)).dim.v["dm_n_comb"] == 16     # com água: 8 + 8
+    # talão: pior caso = pesos e empuxo vertical com γf contra a reação de serviço com 1,0
+    b = r.dim.base
+    tal = b["zona"] == "Talão"
+    dx = g.B_base / len(b["x"])
+    braco = b["x"] - g.x_tb
+    emp = r.fase1.emp
+    pesos = ((b["peso"] + b["carga_talao"]) * braco)[tal].sum() * dx
+    reacao = ((b["sig1"] + b["u"]) * braco)[tal].sum() * dx
+    pav = emp.p_Pav * (emp.p_xPav - g.x_tb)
+    assert d["dm_MSd_tl"] == pytest.approx(gf * pesos + gf * pav - reacao, rel=1e-9)
+    assert d["dm_MSd_tl"] > d["dm_MSd_tl_eq"] > 0
+    # ponta: pior caso = reação com γf contra o peso próprio com 1,0
+    pt = b["zona"] == "Ponta"
+    bp = g.x_fb - b["x"]
+    assert d["dm_MSd_pt_comb"] == pytest.approx(((gf * (b["sig1"] + b["u"]) - b["peso"]) * bp)[pt].sum() * dx, rel=1e-9)
+    # nunca abaixo de γf × serviço
+    assert d["dm_MSd_tl"] >= gf * d["dm_Mtt"] and d["dm_VSd_tl"] >= gf * d["dm_VtT"]
+    assert d["dm_MSd_pt"] >= gf * d["dm_MtP1"] and d["dm_VSd_pt"] >= gf * d["dm_VtP"]
+
+
+def test_equilibrio_do_no_cortina_sapata():
+    """A ponta absorve o momento da cortina que o talão não absorve (modo 'Máximo')."""
+    from tests.test_geo5 import CRITERIOS_TALAO, MURO_TALAO
+    r = calcular(Entrada(**MURO_TALAO, **{**CRITERIOS_TALAO, "ponta_mod": "Máximo"}))
+    d = r.dim.v
+    assert d["dm_no_gov"] and any("equilíbrio do nó" in n for n in r.dim.notas)
+    assert d["dm_MSd_pt"] == pytest.approx(d["dm_MSdp"] - d["dm_MSd_tl"], rel=1e-6)
+    assert d["dm_MSd_pt"] + d["dm_MSd_tl"] == pytest.approx(94.35, rel=0.002)   # = haste do GEO5 (67,68 + 26,68)
+    assert d["dm_MSd_pt"] > 67.68                                               # ponta acima da do GEO5
+    # sem talão a regra é a da planilha: ponta = cortina
+    s = calcular(Entrada(b_talao=0.0, b_ponta=1.5)).dim.v
+    assert s["dm_MSd_pt"] >= s["dm_MSdp"] - 1e-9 and not s["dm_no_gov"]
+    # com contrafortes a base é laje: a regra do nó não se aplica ao balanço
+    assert calcular(Entrada(cf_usar=True)).dim.v["dm_M_no"] == 0.0
 
 
 def test_combinacao_favoravel_reproduz_o_cortante_da_ponta_do_geo5():
