@@ -5,7 +5,7 @@ Leia-o inteiro antes de mexer em qualquer coisa. O estado técnico detalhado est
 [README.md](README.md); o plano original, em [PLANEJAMENTO.md](PLANEJAMENTO.md) (histórico — não é
 mais a referência).
 
-Situação em 16/11/2026: aplicativo completo e funcionando, **196 testes passando**.
+Situação em 16/11/2026: aplicativo completo e funcionando, **197 testes passando**.
 
 ---
 
@@ -75,7 +75,7 @@ core/             campos.py (GERADO) · enums.py · models.py · geometria.py ·
 ui/               estado.py · inputs.py · painel.py · graficos.py · armacao.py · estudo_solo.py · formato.py
 io_/              projeto.py (JSON) · excel.py · memorial.py (PDF) · sondagem.py (leitura do PDF de SPT)
 tools/            gerar_campos.py · gerar_cenarios.py
-tests/            9 arquivos, 196 testes; tests/data/cenarios.json é a referência do Excel
+tests/            9 arquivos, 197 testes; tests/data/cenarios.json é a referência do Excel
 ```
 
 Cadeia de cálculo (funções puras, sem iteração):
@@ -203,6 +203,15 @@ empuxo, com pesos e ancoragem em 1,0; o aplicativo multiplica tudo por γf e a e
 (`comb_fav` em `core/dimensionamento.py`, valores `dm_*_fav` e `bd_s_fav`), que reproduz os 269 kPa e
 os cortantes de ponta do GEO5 (23,0 e 46,0 kN/m nos dois primeiros casos).
 
+Quarto caso (16/11/2026): muro com talão e cunha inclinada (primeira validação desse modelo contra o
+GEO5), rodado em C20 e em C25. Estabilidade, haste e cortante da ponta reproduzidos. Momento do avanço:
+67,68 no GEO5 × 30,9 no aplicativo (pressões na base). **Confirmado** com a página do dente: o GEO5 usa
+o equilíbrio do nó, avanço = haste − dente = 94,35 − 26,68. O dente do GEO5 (26,68 kN·m/m e 21,26 kN/m)
+usa empuxo × 1,4, pesos × 1,0 e a reação do solo de serviço × 1,0, e soma o momento do empuxo
+horizontal; o cortante foi reproduzido, o momento só com a seção 0,10 m dentro da haste (regra não
+identificada). O aplicativo dá 11,5 e 16,6 no talão. **Ajuste proposto e ainda não decidido**: momento da
+ponta ≥ haste − talão (equilíbrio do nó) e talão com a reação de serviço sem majorar.
+
 Diferenças que permanecem, com o aplicativo a favor da segurança salvo indicação:
 
 - momento resistente da cortina: 100,5 × 101,75 kN·m/m. Hipótese **não confirmada**: o GEO5 soma a
@@ -234,7 +243,7 @@ Proponha antes de fazer; a decisão é do projetista.
    ou **entrada/saída** (`io_/`).
 2. Se envolver a planilha, releia as células envolvidas com `openpyxl` (fórmulas e valores) antes
    de escrever código.
-3. Rode `pytest` antes de começar, para confirmar os 196 testes verdes.
+3. Rode `pytest` antes de começar, para confirmar os 197 testes verdes.
 4. Faça a mudança no núcleo primeiro, com teste; só depois a interface.
 5. Se o resultado passar a diferir da planilha, pare e classifique: erro de porte (corrija) ou
    desvio deliberado (registre em `premissas.py`, no README e como exceção nomeada na paridade).
