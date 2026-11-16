@@ -28,6 +28,11 @@ class Forca:
     grupo: str = "peso"   # peso | solo_ponta | agua  (fator de majoração no dimensionamento)
 
 
+# Linhas da tabela de forças que são ações desfavoráveis de empuxo (recebem γf na combinação com as
+# ações favoráveis em 1,0 — core.dimensionamento).
+PREFIXOS_EMPUXO = ("Empuxo —", "Cargas em faixa, linha e ponto — empuxo")
+
+
 @dataclass(frozen=True)
 class Ancoragem:
     anc_Tp: float

@@ -5,7 +5,7 @@ Leia-o inteiro antes de mexer em qualquer coisa. O estado técnico detalhado est
 [README.md](README.md); o plano original, em [PLANEJAMENTO.md](PLANEJAMENTO.md) (histórico — não é
 mais a referência).
 
-Situação em 16/11/2026: aplicativo completo e funcionando, **192 testes passando**.
+Situação em 16/11/2026: aplicativo completo e funcionando, **194 testes passando**.
 
 ---
 
@@ -38,6 +38,7 @@ concreto armado (ABNT NBR 11682) e dimensionamento estrutural (ABNT NBR 6118), p
 | 16/11/2026 | Padrões: **δb = 3/4·φ**, **adesão a = α·c** com α por tipo de solo, **solo da frente em repouso** |
 | 16/11/2026 | Excentricidade: limite continua B/6; **entre B/6 e B/4 aceita se a base resistir** à distribuição triangular (descolamento); acima de B/4 reprova |
 | 16/11/2026 | **Cargas em faixa, em linha e concentrada** (Boussinesq/Terzaghi), parede rígida ×2 por padrão; carga pontual pela média num comprimento de muro |
+| 16/11/2026 | Base dimensionada pela **envoltória** de γf × serviço com a combinação de **ações favoráveis em 1,0** (critério do GEO5) |
 
 Regra derivada: todo novo desvio em relação à planilha tem de ser (a) registrado em
 `core/premissas.py` (`DIFERENCAS_DA_PLANILHA`), (b) descrito no README e (c) coberto por teste.
@@ -74,7 +75,7 @@ core/             campos.py (GERADO) · enums.py · models.py · geometria.py ·
 ui/               estado.py · inputs.py · painel.py · graficos.py · armacao.py · estudo_solo.py · formato.py
 io_/              projeto.py (JSON) · excel.py · memorial.py (PDF) · sondagem.py (leitura do PDF de SPT)
 tools/            gerar_campos.py · gerar_cenarios.py
-tests/            9 arquivos, 192 testes; tests/data/cenarios.json é a referência do Excel
+tests/            9 arquivos, 194 testes; tests/data/cenarios.json é a referência do Excel
 ```
 
 Cadeia de cálculo (funções puras, sem iteração):
@@ -162,7 +163,7 @@ Lista completa e atualizada em `core/premissas.py` e no README. Resumo:
 - FS e tensão infinitos no lugar das sentinelas; comparações com tolerância 1e-9.
 
 Nos testes de paridade (`tests/test_paridade_planilha.py`) essas diferenças aparecem como exceções
-nomeadas (`_BASE`, `_FRONTAL`, `_ANCORAGEM`). **Não alargue a tolerância (1e-8) para fazer um teste passar**:
+nomeadas (`_BASE`, `_FRONTAL`, `_ANCORAGEM`, `_FAVORAVEIS`). **Não alargue a tolerância (1e-8) para fazer um teste passar**:
 ou é erro de porte, ou é um desvio novo que precisa ser decidido com o projetista.
 
 Defeitos da própria planilha (já comunicados): `Resumo!C35` usa `CONCAT`, inexistente no Excel do
@@ -198,8 +199,9 @@ eixos (l + espessura). Cortina: mesmas fórmulas, aplicativo ~4 % acima (o GEO5 
 Contraforte: aplicativo 40 % acima (o GEO5 usa coeficiente 1,0). As mín do GEO5 = 0,15 %·b·d (aplicativo:
 b·h). **Base entre contrafortes: aplicativo 17 % ABAIXO do GEO5** (224 × 269 kPa) — o GEO5 majora só o
 empuxo, com pesos e ancoragem em 1,0; o aplicativo multiplica tudo por γf e a excentricidade fica menor.
-É a mesma causa do cortante da ponta (pendência 2). Correção proposta e ainda não decidida: envoltória
-com a combinação de ações favoráveis em 1,0 (NBR 8681).
+**Corrigido em 16/11/2026**: a base usa a envoltória com a combinação de ações favoráveis em 1,0
+(`comb_fav` em `core/dimensionamento.py`, valores `dm_*_fav` e `bd_s_fav`), que reproduz os 269 kPa e
+os cortantes de ponta do GEO5 (23,0 e 46,0 kN/m nos dois primeiros casos).
 
 Diferenças que permanecem, com o aplicativo a favor da segurança salvo indicação:
 
@@ -214,7 +216,7 @@ Diferenças que permanecem, com o aplicativo a favor da segurança salvo indica�
 Proponha antes de fazer; a decisão é do projetista.
 
 1. A opção legada "0,259 (GEO5)" para o limite x/d não reproduz o GEO5 (aplicativo x/d = 0,37).
-2. Cortante da ponta mais conservador que o do GEO5 (item acima).
+2. (Resolvida em 16/11/2026) Cortante da ponta: a combinação de ações favoráveis em 1,0 reproduz o GEO5; o aplicativo adota a envoltória com γf × serviço.
 3. A água na cortina em balanço é majorada por `gf_f`, e não por `gw_f`. Só importa se os dois
    forem diferentes; no padrão são iguais.
 4. Os 11 casos GEO5 citados na aba `Notas` não viraram testes: a aba traz só resultados, sem os
@@ -232,7 +234,7 @@ Proponha antes de fazer; a decisão é do projetista.
    ou **entrada/saída** (`io_/`).
 2. Se envolver a planilha, releia as células envolvidas com `openpyxl` (fórmulas e valores) antes
    de escrever código.
-3. Rode `pytest` antes de começar, para confirmar os 192 testes verdes.
+3. Rode `pytest` antes de começar, para confirmar os 194 testes verdes.
 4. Faça a mudança no núcleo primeiro, com teste; só depois a interface.
 5. Se o resultado passar a diferir da planilha, pare e classifique: erro de porte (corrija) ou
    desvio deliberado (registre em `premissas.py`, no README e como exceção nomeada na paridade).

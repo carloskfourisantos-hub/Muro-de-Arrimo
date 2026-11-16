@@ -224,7 +224,9 @@ def test_excentricidade_entre_B6_e_B4_exige_verificacao_da_base():
     assert smax == pytest.approx(2 * r.fase1.forcas.F_N / Lc)
     sa = smax * (1 - a / Lc)
     M = sa * a**2 / 2 + (smax - sa) * a**2 / 3 - e.gam_c * e.h_sap * a**2 / 2
-    assert d["ex_M_pt"] == pytest.approx(M, rel=2e-3)
+    gf = e.gf_f
+    assert d["ex_MSd_pt"] >= gf * M * (1 - 2e-3)                      # envoltória: nunca abaixo de γf × serviço
+    assert d["ex_MSd_pt"] == pytest.approx(max(gf * M, d["ex_MSd_pt"]))
     assert d["ex_face_pt"] == "inferior" and d["ex_face_tl"] == "superior"
     assert d["ex_dAs_pt"] == 0.0 and d["ex_dAs_tl"] == 0.0 and r.dim.atende
 
@@ -343,3 +345,29 @@ def test_cargas_concentradas_na_interface_e_no_memorial():
         plt.close(fig)
     assert memorial.gerar_pdf(r, {"nome": "teste"})[:4] == b"%PDF"
     assert any("Boussinesq" in n for n in r.dim.notas)
+
+
+# ------------------------------------- base: envoltória com a combinação de ações favoráveis em 1,0
+def test_base_usa_a_envoltoria_das_duas_combinacoes():
+    r = calcular(Entrada(b_talao=0.0, b_ponta=2.2, ponta_mod="Pressões na base"))
+    d, gf = r.dim.v, r.entrada.gf_f
+    assert d["dm_fav_gov"] and any("ações favoráveis em 1,0" in n for n in r.dim.notas)
+    assert d["dm_MSd_pt_fav"] > gf * d["dm_MtP1"]                    # a combinação favorável governa
+    assert d["dm_MSd_pt"] == pytest.approx(d["dm_MSd_pt_fav"])
+    assert d["dm_VSd_pt"] == pytest.approx(max(gf * d["dm_VtP"], d["dm_VSd_pt_fav"]))
+    # N e excentricidade de cálculo: só o empuxo com γf
+    F = r.fase1.forcas
+    emp_v = sum(f.Fz for f in F.linhas if f.nome.startswith("Empuxo —"))
+    assert d["dm_N_fav"] == pytest.approx(F.F_N + (gf - 1) * emp_v)
+    assert abs(d["dm_e_fav"]) > abs(r.fase1.verif.R_e)               # excentricidade maior que a de serviço
+    # no exemplo padrão quem governa é γf × serviço: nada muda
+    p = calcular(Entrada()).dim.v
+    assert not p["dm_fav_gov"] and p["dm_MSd_tl"] == pytest.approx(gf * p["dm_Mtt"])
+
+
+def test_combinacao_favoravel_reproduz_o_cortante_da_ponta_do_geo5():
+    from tests.test_geo5 import CRITERIOS_ANC, CRITERIOS_GEO5, MURO, MURO_ANC
+    d1 = calcular(Entrada(**MURO, **CRITERIOS_GEO5)).dim.v
+    d2 = calcular(Entrada(**MURO_ANC, **CRITERIOS_ANC)).dim.v
+    assert d1["dm_VSd_pt_fav"] == pytest.approx(23.00, rel=0.02)      # memorial de 13/11/2026
+    assert d2["dm_VSd_pt_fav"] == pytest.approx(46.01, rel=0.02)      # memorial de 16/11/2026

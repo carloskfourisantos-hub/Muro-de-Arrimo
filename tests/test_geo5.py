@@ -216,6 +216,15 @@ def test_contrafortes_dimensionamento(geo5_cf):
     # contraforte: o GEO5 usa coeficiente 1,0 nas ações; o aplicativo aplica γf
     assert d["cf_MSd"] == pytest.approx(1.4 * 178.40, rel=0.003)
     assert d["cf_VSd"] == pytest.approx(1.4 * 156.78, rel=0.006)
-    # base entre contrafortes — diferença CONTRA a segurança, pendente de decisão: o GEO5 majora só o
-    # empuxo (pesos e ancoragem com 1,0), a excentricidade cresce e a tensão sobe para 269,24 kPa
-    assert d["bd_s"] == pytest.approx(224.08, abs=0.05) and d["bd_s"] < 269.24
+    # base entre contrafortes: envoltória com a combinação de ações favoráveis em 1,0 (só o empuxo com γf),
+    # que é a do GEO5 — tensão na borda, momentos por metro, armadura e cortante
+    assert d["bd_s_fav"] == pytest.approx(269.24, rel=0.001) and d["bd_s"] == d["bd_s_fav"]
+    assert d["bd_M12"] == pytest.approx(90.87 / 0.8, rel=0.001)
+    assert d["bd_M20"] == pytest.approx(54.52 / 0.8, rel=0.001)
+    assert d["bd_V"] == pytest.approx(242.31 / 0.8, rel=0.001)
+    assert d["bd_Ass"] * 100 == pytest.approx(869.0 / 0.8, rel=0.003)
+    assert d["bd_Asi"] < 0 or d["bd_Asi"] * 100 == pytest.approx(1647.0 / 0.8, rel=0.02)
+    sit = {c.nome: c.situacao for c in geo5_cf.dim.checks}
+    assert sit["Base entre contrafortes: As inferior ≥ As nec"] == "NÃO OK"       # como no GEO5
+    assert sit["Base entre contrafortes: As superior ≥ As nec"] == "NÃO OK"
+    assert sit["Base entre contrafortes: VSd ≤ VRd (senão, estribos)"] == "NÃO OK"

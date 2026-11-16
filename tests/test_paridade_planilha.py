@@ -11,6 +11,7 @@ import pytest
 
 from core.fases import calcular
 from core.models import Entrada
+from core.planilha import MODO_PLANILHA
 from tests.paridade import carregar, comparar
 
 CENARIOS = carregar()
@@ -34,6 +35,12 @@ _FRONTAL = ("dm_MSdp", "dm_Asnp", "dm_utp", "dm_VSd:", "dm_MSdn", "dm_Asnn", "dm
 # aplicativo não a desconta (como o GEO5), e os esforços da ponta ficam maiores.
 _ANCORAGEM = ("dm_MtP", "dm_VtP", "dm_Mtp", "dm_MSd_pt", "dm_As_pt", "dm_VSd_pt", "dm_geral") + tuple(
     f"chk_{r}_" for r in (16, 17, 18, 19))
+# Quarto desvio DELIBERADO: a base é dimensionada pela envoltória de γf × esforços de serviço (planilha) com
+# a combinação de ações favoráveis em 1,0 (só o empuxo e a água com γf — NBR 8681, como o GEO5). Quando a
+# segunda governa, os esforços da base ficam maiores que os da planilha.
+_FAVORAVEIS = ("dm_MSd_pt", "dm_As_pt", "dm_MSd_tl", "dm_As_tl", "dm_VSd_pt", "bd_s", "bd_w", "bd_V", "bd_M",
+               "bd_As", "bd_xd", "dm_geral") + tuple(f"chk_{r}_" for r in (16, 17, 19, 20, 21, 23, 24, 25, 26))
+
 
 @pytest.mark.parametrize("cenario", CENARIOS, ids=[c["nome"] for c in CENARIOS])
 def test_paridade(cenario):
@@ -55,6 +62,13 @@ def test_paridade(cenario):
         if not res.dim.base_invalida:
             assert res.dim.v["dm_VtP"] >= xl["dm_VtP"] - 1e-9            # sempre a favor da segurança
             assert res.dim.v["dm_MtP1"] >= xl["dm_MtP1"] - 1e-9
+    res_pl = calcular(Entrada(**{**ent, **MODO_PLANILHA}))               # o mesmo cálculo comparado acima
+    if res_pl.dim.v["dm_fav_gov"]:
+        dif = [d for d in dif if not d.startswith(_FAVORAVEIS)]
+        xl = cenario["saidas"]
+        if not (res_pl.dim.base_invalida or ent["anc_usar"] or ent["ff_tipo"] == "Em repouso"):
+            for k in ("dm_MSd_pt", "dm_MSd_tl", "dm_VSd_pt"):              # sempre a favor da segurança
+                assert res_pl.dim.v[k] >= xl[k] - 1e-9, k
     assert not sem, f"nomes da planilha sem equivalente no núcleo: {sem}"
     assert n > 550
     assert not dif, f"{len(dif)} divergência(s) em {n} valores:\n  " + "\n  ".join(dif[:20])

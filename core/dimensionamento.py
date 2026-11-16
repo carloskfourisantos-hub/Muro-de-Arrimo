@@ -19,6 +19,7 @@ from .concreto import Concreto, area_barras, criar_concreto
 from .empuxo import SEM_NA, k_mazindrani
 from .enums import (LimiteXd, MetodoEmpuxo, ModeloCortante, ModeloLajeCF, MomentoPonta, PesoNA, PosicaoContraforte,
                     PressaoLaje, ResFrontal, Subpressao, TensaoDim, TipoEmpuxo)
+from .forcas import PREFIXOS_EMPUXO
 from .geometria import TOL, Geometria
 from .verificacoes import EB_FAIXA, INF, tensoes_lineares
 
@@ -222,12 +223,58 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
         return (float((eh_ponta * q * (g.x_fb - xb)).sum()) * dx,
                 float((eh_ponta * q).sum()) * dx)
 
-    def talao(q, emp):
+    def talao(q, emp, kpav=1.0):
         pav_on = tem_talao and emp.p_xPav > g.x_tb
         M = -float((eh_talao * q * (xb - g.x_tb)).sum()) * dx + anc_M_tl + (
-            emp.p_Pav * (emp.p_xPav - g.x_tb) if pav_on else 0.0)
-        V = -float((eh_talao * q).sum()) * dx + anc_V_tl + (emp.p_Pav if pav_on else 0.0)
+            kpav * emp.p_Pav * (emp.p_xPav - g.x_tb) if pav_on else 0.0)
+        V = -float((eh_talao * q).sum()) * dx + anc_V_tl + (kpav * emp.p_Pav if pav_on else 0.0)
         return M, V
+
+    # Combinação com as ações favoráveis em 1,0 (NBR 8681): só o empuxo e a água recebem γf; pesos,
+    # ancoragem e resistências ficam com 1,0. A excentricidade de cálculo cresce e a tensão na borda pode
+    # superar γf × tensão de serviço. O dimensionamento da base usa a envoltória das duas combinações.
+    def comb_fav(f):
+        N = M = 0.0
+        for ln in f.forcas.linhas:
+            if ln.nome.startswith(PREFIXOS_EMPUXO):
+                k = gf
+            elif ln.grupo == "agua":
+                k = gw if ln.Fx >= 0 else 1.0
+            elif ln.grupo == "solo_ponta":
+                k = min(e.gf_sp, 1.0)
+            else:
+                k = 1.0
+            N += k * ln.Fz
+            M += k * (ln.Mres - ln.Movr)
+        return N, (B / 2 - M / N if N > 0 else 0.0)
+
+    def q_fav(f, linear=False):
+        """Carga líquida de cálculo na base (kPa) na combinação favorável; None se a resultante sai da base."""
+        N, ex = comb_fav(f)
+        if N <= 0 or abs(ex) >= B / 2:
+            return None
+        Bef = B - 2 * abs(ex)
+        emp = f.emp
+        us = gw * (emp.p_u0 + (emp.p_uB - emp.p_u0) * xb / B) if e.subp == Subpressao.LINEAR else 0.0
+        return _sigma_base(xb, N, ex, Bef, N / Bef, B, ret and not linear) + us - w_sap - carga_tal
+
+    fases_dim = (f1, f2) if trav else (f1,)
+    fav_fora = False
+    MB_pt = VB_pt = MB_tl = VB_tl = 0.0
+    for f in fases_dim:
+        qB = q_fav(f)
+        if qB is None:
+            fav_fora = fav_fora or f.forcas.F_N > 0
+            continue
+        if tem_ponta:
+            m, s = ponta(qB)
+            MB_pt, VB_pt = max(MB_pt, m), max(VB_pt, abs(s))
+        if tem_talao:
+            m, s = talao(qB, f.emp, gf)
+            MB_tl, VB_tl = max(MB_tl, m), max(VB_tl, abs(s))
+    Nf1, ef1 = comb_fav(f1)
+    v.update(dm_N_fav=Nf1, dm_e_fav=ef1, dm_MSd_pt_fav=MB_pt, dm_VSd_pt_fav=VB_pt, dm_MSd_tl_fav=MB_tl,
+             dm_VSd_tl_fav=VB_tl)
 
     MtP1, VtP1 = ponta(q1)
     MtP2, VtP2 = ponta(q2) if trav else (0.0, 0.0)
@@ -238,14 +285,16 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
         Mtp, MSd_pt = MkA[0], float(MSdA[0])
     elif e.ponta_mod == MomentoPonta.PRESSOES:
         Mtp = max(MtP1, MtP2)
-        MSd_pt = gf * Mtp
+        MSd_pt = max(gf * Mtp, MB_pt)
     else:
         Mtp = max(MtP1, MtP2, MkA[0] if not tem_talao else 0.0)
-        MSd_pt = max(gf * MtP1, gf * MtP2, float(MSdA[0]) if not tem_talao else 0.0)
+        MSd_pt = max(gf * MtP1, gf * MtP2, float(MSdA[0]) if not tem_talao else 0.0, MB_pt)
     MtT1, VtT1 = talao(q1, emp1) if tem_talao else (0.0, 0.0)
     MtT2, VtT2 = talao(q2, emp2) if (tem_talao and trav) else (0.0, 0.0)
     Mtt = max(0.0, MtT1, MtT2)
     VtT = max(abs(VtT1), abs(VtT2))
+    gov_bal = (MB_pt > gf * max(MtP1, MtP2) + 1e-9 or VB_pt > gf * VtP + 1e-9 or MB_tl > gf * Mtt + 1e-9
+               or VB_tl > gf * VtT + 1e-9)
     Abi = area_barras(e.ar_bi_phi, e.ar_bi_s)
     Abs_ = area_barras(e.ar_bs_phi, e.ar_bs_s)
     db_i = hs - e.cob_bs / 100 - e.ar_bi_phi / 2000
@@ -253,9 +302,9 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
     Asminb = c.rho_min * 100 * hs * 100
     v.update(dm_Abi=Abi, dm_Abs=Abs_, dm_MtP1=MtP1, dm_MtP2=MtP2, dm_VtP=VtP, dm_Mtp=Mtp, dm_MtT1=MtT1,
              dm_MtT2=MtT2, dm_Mtt=Mtt, dm_db_i=db_i, dm_db_s=db_s, dm_MSd_pt=MSd_pt,
-             dm_As_pt=c.as_nec(MSd_pt, db_i), dm_MRd_pt=c.mrd(Abi, db_i), dm_MSd_tl=gf * Mtt,
-             dm_As_tl=c.as_nec(gf * Mtt, db_s), dm_MRd_tl=c.mrd(Abs_, db_s), dm_Asminb=Asminb,
-             dm_VSd_pt=gf * VtP, dm_VRd_pt=vrd(Abi, db_i))
+             dm_As_pt=c.as_nec(MSd_pt, db_i), dm_MRd_pt=c.mrd(Abi, db_i), dm_MSd_tl=max(gf * Mtt, MB_tl),
+             dm_As_tl=c.as_nec(max(gf * Mtt, MB_tl), db_s), dm_MRd_tl=c.mrd(Abs_, db_s), dm_Asminb=Asminb,
+             dm_VSd_pt=max(gf * VtP, VB_pt), dm_VRd_pt=vrd(Abi, db_i))
 
     # ------------------------------------------- cortina como laje entre contrafortes
     l = max(0.01, e.cf_esp - e.cf_t)
@@ -293,6 +342,11 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
     bd_M = sum(f.Mres * fat[f.grupo] for f in lin) - sum(f.Movr * fat[f.grupo] for f in lin)
     bd_e = B / 2 - bd_M / bd_N if bd_N > 0 else 0.0
     bd_s = tensoes_lineares(bd_N, bd_e, B)[0]
+    # envoltória com a combinação de ações favoráveis em 1,0
+    bd_s_fav = max((tensoes_lineares(*comb_fav(f), B)[0] for f in fases_dim), default=0.0)
+    v.update(bd_s_fav=bd_s_fav, bd_s_plan=bd_s)
+    if math.isfinite(bd_s_fav):
+        bd_s = max(bd_s, bd_s_fav)
     bd_qh = gf * ((e.gam_at * g.solo.A + e.q_sc * larg_q) / e.b_talao + e.gam_c * hs) if tem_talao else 0.0
     bd_w = bd_s if frente else bd_qh
     M12, M20, bd_V = bd_w * l**2 / 12, bd_w * l**2 / 20, bd_w * l / 2
@@ -405,7 +459,9 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
     )
 
     # ---------------------------- verificações adicionais do aplicativo (NBR 6118)
-    VSd_tl, VRd_tl = gf * VtT, vrd(Abs_, db_s)
+    VSd_tl, VRd_tl = max(gf * VtT, VB_tl), vrd(Abs_, db_s)
+    fav_gov = gov_bal or (frente and cf and bd_s > v["bd_s_plan"] + 1e-9)
+    v["dm_fav_gov"] = bool(fav_gov)
     v.update(dm_VtT=VtT, dm_VSd_tl=VSd_tl, dm_VRd_tl=VRd_tl, dm_xd_lim=xd_lim)
     extras = [
         Check("Talão em balanço: VSd ≤ VRd (NBR 6118 19.4.1)", VSd_tl, VRd_tl,
@@ -457,34 +513,39 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
         for f in fases_faixa:
             V_ = f.verif
             q_ = _sigma_base(xb, f.forcas.F_N, V_.R_e, V_.R_Bef, V_.R_sef, B, False) + usub - w_sap - carga_tal
-            m, s = ponta(q_) if tem_ponta else (0.0, 0.0)
-            Mp, Vp = (m if abs(m) > abs(Mp) else Mp), max(Vp, abs(s))
-            m, s = talao(q_, f.emp) if tem_talao else (0.0, 0.0)
-            Mt, Vt = (m if abs(m) > abs(Mt) else Mt), max(Vt, abs(s))
+            casos = [(q_, 1.0, gf)]                      # serviço × γf
+            qB = q_fav(f, linear=True)                   # favoráveis em 1,0 (já de cálculo)
+            if qB is not None:
+                casos.append((qB, gf, 1.0))
+            for qq, kpav, mult in casos:
+                m, s = ponta(qq) if tem_ponta else (0.0, 0.0)
+                Mp, Vp = (mult * m if abs(mult * m) > abs(Mp) else Mp), max(Vp, abs(mult * s))
+                m, s = talao(qq, f.emp, kpav) if tem_talao else (0.0, 0.0)
+                Mt, Vt = (mult * m if abs(mult * m) > abs(Mt) else Mt), max(Vt, abs(mult * s))
         pior = max(fases_faixa, key=lambda f: f.verif.R_eB).verif
         L_comp = pior.frac_comp * B
         # ponta: M > 0 traciona a face inferior; talão: M > 0 traciona a face superior
         inf_, sup_ = ("inferior", Abi, db_i), ("superior", Abs_, db_s)
         fp, Ap, dp_ = inf_ if Mp >= 0 else sup_
         ft, At, dt_ = sup_ if Mt >= 0 else inf_
-        As_p, As_t = c.as_nec(gf * abs(Mp), dp_), c.as_nec(gf * abs(Mt), dt_)
+        As_p, As_t = c.as_nec(abs(Mp), dp_), c.as_nec(abs(Mt), dt_)
         falta = lambda nec, ef: 0.0 if 0 <= nec <= ef else (nec - ef if nec > 0 else math.nan)  # noqa: E731
         v.update(ex_eB=pior.R_eB, ex_frac=pior.frac_comp, ex_Lcomp=L_comp, ex_Ldesc=B - L_comp,
-                 ex_sig_max=pior.sig_max, ex_M_pt=Mp, ex_M_tl=Mt, ex_MSd_pt=gf * abs(Mp), ex_MSd_tl=gf * abs(Mt),
+                 ex_sig_max=pior.sig_max, ex_M_pt=Mp, ex_M_tl=Mt, ex_MSd_pt=abs(Mp), ex_MSd_tl=abs(Mt),
                  ex_As_pt=As_p, ex_As_tl=As_t, ex_dAs_pt=falta(As_p, Ap), ex_dAs_tl=falta(As_t, At),
-                 ex_face_pt=fp, ex_face_tl=ft, ex_VSd_pt=gf * Vp, ex_VSd_tl=gf * Vt)
+                 ex_face_pt=fp, ex_face_tl=ft, ex_VSd_pt=Vp, ex_VSd_tl=Vt)
         rot = "Base com descolamento (e entre o limite e B/4)"
         extras += [
             Check(f"{rot}: área comprimida ≥ 2/3 da base (NBR 6122 7.6.2)", 2 / 3, pior.frac_comp,
                   _st_max(2 / 3, pior.frac_comp), Bs, True, "-"),
             Check(f"{rot} — ponta, face {fp}: As ef ≥ As nec", As_p, Ap,
                   _st_as(As_p, Ap) if (tem_ponta and pt_on) else NA, Bs, True, "cm²/m"),
-            Check(f"{rot} — ponta: VSd ≤ VRd", gf * Vp, vrd(Ap, dp_),
-                  _st_max(gf * Vp, vrd(Ap, dp_)) if (tem_ponta and pt_on) else NA, Bs, True, "kN/m"),
+            Check(f"{rot} — ponta: VSd ≤ VRd", Vp, vrd(Ap, dp_),
+                  _st_max(Vp, vrd(Ap, dp_)) if (tem_ponta and pt_on) else NA, Bs, True, "kN/m"),
             Check(f"{rot} — talão, face {ft}: As ef ≥ As nec", As_t, At,
                   _st_as(As_t, At) if (tem_talao and tl_on) else NA, Bs, True, "cm²/m"),
-            Check(f"{rot} — talão: VSd ≤ VRd", gf * Vt, vrd(At, dt_),
-                  _st_max(gf * Vt, vrd(At, dt_)) if (tem_talao and tl_on) else NA, Bs, True, "kN/m"),
+            Check(f"{rot} — talão: VSd ≤ VRd", Vt, vrd(At, dt_),
+                  _st_max(Vt, vrd(At, dt_)) if (tem_talao and tl_on) else NA, Bs, True, "kN/m"),
         ]
         fm = lambda x, n=2: f"{x:.{n}f}".replace(".", ",")  # noqa: E731
         def txt_falta(d_, face):
@@ -497,11 +558,15 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
             f"núcleo central e a base descola em {fm(B - L_comp)} m do lado oposto à tensão máxima (comprimidos "
             f"{fm(L_comp)} m = {fm(100 * pior.frac_comp, 0)} % de B; σmáx = {fm(pior.sig_max, 1)} kPa). O solo não "
             "resiste à tração (NBR 6122 7.6.2), então a base foi verificada com a distribuição triangular: "
-            f"ponta, MSd = {fm(gf * abs(Mp), 1)} kN·m/m, As nec = {fm(max(As_p, 0))} cm²/m — "
-            f"{txt_falta(v['ex_dAs_pt'], fp)}; talão, MSd = {fm(gf * abs(Mt), 1)} kN·m/m, As nec = "
+            f"ponta, MSd = {fm(abs(Mp), 1)} kN·m/m, As nec = {fm(max(As_p, 0))} cm²/m — "
+            f"{txt_falta(v['ex_dAs_pt'], fp)}; talão, MSd = {fm(abs(Mt), 1)} kN·m/m, As nec = "
             f"{fm(max(As_t, 0))} cm²/m — {txt_falta(v['ex_dAs_tl'], ft)}. O trecho descolado do talão trabalha "
             "sem reação do solo, carregado pelo peso do aterro e pelo peso próprio. Acima de B/4 o muro é "
             "reprovado; prefira aumentar a base quando o descolamento ocorrer sob cargas permanentes.")
+    if fav_gov:
+        notas.append("Base dimensionada pela combinação com as ações favoráveis em 1,0 (NBR 8681): só o empuxo e a "
+                     "água recebem γf; pesos, ancoragem e resistências ficam com 1,0. A excentricidade de cálculo "
+                     "cresce e os esforços superam γf × os de serviço, que é o critério da planilha.")
     if conc is not None and conc.ativo:
         notas.append("Cargas em faixa, em linha e concentrada: pressões pela teoria da elasticidade (Boussinesq, "
                      "na forma de Terzaghi/NAVFAC), horizontais, somadas ao empuxo de terra e majoradas por γf. "
@@ -511,7 +576,12 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
                         "verifique-os à parte." if cf else ""))
     fora = lambda f: f.forcas.F_N > 0 and abs(f.verif.R_e) >= B / 2   # noqa: E731
     base_invalida = fora(f1) or (trav and fora(f2))
-    if base_invalida:
+    if fav_fora and not base_invalida:
+        base_invalida = True
+        notas.append("Com o empuxo majorado por γf e os pesos com 1,0 (combinação de ações favoráveis, NBR 8681) a "
+                     "resultante de cálculo sai da base: não há distribuição de tensões para dimensionar ponta e "
+                     "talão. Aumente a base.")
+    elif base_invalida:
         notas.append("Resultante fora da base (|e| ≥ B/2): não existe distribuição de tensões no solo, então "
                      "ponta e talão não podem ser dimensionados. A planilha segue calculando com tensões "
                      "negativas nesse caso; o aplicativo reprova o dimensionamento da base.")
