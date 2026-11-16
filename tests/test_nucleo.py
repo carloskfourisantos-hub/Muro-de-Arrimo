@@ -105,7 +105,7 @@ def test_travamento_minimo_exato_atende_os_fs():
 
 def test_travamento_exato_coincide_com_a_planilha_sem_adesao():
     """Sem adesão (kc = 0) B' não entra na resistência e a estimativa da planilha é exata."""
-    e = Entrada(trav_usar=True)
+    e = Entrada(trav_usar=True, k_c=0.0)
     est = calcular(e).trav.TR_Fd
     assert travamento_minimo_exato(e).F_desl == pytest.approx(est, abs=2e-3)
 
@@ -175,3 +175,79 @@ def test_verificacao_extra_do_cortante_no_talao():
     extra = r.dim.extras[0]
     assert "Talão" in extra.nome and extra.extra and extra.situacao in ("OK", "NÃO OK")
     assert extra.solicitante == pytest.approx(r.dim.v["dm_VSd_tl"])
+
+
+# ------------------------------------------------- padrões de 16/11/2026 e faixa de excentricidade
+def test_padroes_do_aplicativo():
+    e = Entrada()
+    assert e.k_phi == 0.75 and e.k_c == 0.5 and e.ff_tipo == "Em repouso"
+    v = calcular(e).fase1.verif
+    assert v.delta_b == pytest.approx(0.75 * e.phi_f)
+    assert v.adesao == pytest.approx(0.5 * e.c_f)
+    assert v.Hres_externas > 0                                # solo da frente em repouso, somado à resistência
+
+
+def test_alfa_da_adesao_por_tipo_de_solo():
+    from core import solos
+    for tipo in ("Areia", "Silte", "Silte arenoso", "Areia siltosa"):       # coesão aparente
+        assert solos.sugerir(tipo, 12).alfa == 0.0
+    for tipo in ("Areia argilosa", "Silte argiloso", "Argila arenosa"):
+        assert solos.sugerir(tipo, 12).alfa == 0.5
+    assert solos.sugerir("Argila", 6).alfa == pytest.approx(2 / 3)          # média
+    assert solos.sugerir("Argila", 12).alfa == 0.5                          # rija
+    assert all(0.0 <= solos.sugerir(t, n).alfa <= 2 / 3 + 1e-12 for t in solos.TIPOS for n in (1, 5, 10, 20, 40))
+    # não drenado: razão adesão/Su do NAVFAC DM-7.2, decrescente com a consistência
+    assert solos.alfa_nao_drenado(10) == 1.0 and solos.alfa_nao_drenado(24) == 1.0
+    assert solos.alfa_nao_drenado(48) == pytest.approx(0.75)
+    assert solos.alfa_nao_drenado(72) == pytest.approx(0.61)
+    assert solos.alfa_nao_drenado(500) == pytest.approx(0.32)
+    assert solos.sugerir("Argila", 6, nao_drenado=True).alfa == pytest.approx(solos.alfa_nao_drenado(60))
+
+
+_FAIXA = dict(b_talao=0.8, cc_modo="Informada", qult_inf=2000)             # e/B = 0,22
+
+
+def test_excentricidade_entre_B6_e_B4_exige_verificacao_da_base():
+    r = calcular(Entrada(**_FAIXA))
+    v, d = r.fase1.verif, r.dim.v
+    assert 1 / 6 < v.R_eB < 0.25
+    assert not v.ok_exc and v.exc_faixa and v.exc_aceita
+    assert v.frac_comp == pytest.approx(3 * (0.5 - v.R_eB)) and v.frac_comp >= 0.75
+    desc = [c for c in r.dim.extras if "descolamento" in c.nome]
+    assert len(desc) == 5 and all(c.situacao == "OK" for c in desc)
+    assert d["ex_Lcomp"] + d["ex_Ldesc"] == pytest.approx(r.geo.B_base)
+    # ponta: solução fechada do balanço sob a distribuição triangular menos o peso próprio
+    B, a, e = r.geo.B_base, r.entrada.b_ponta, r.entrada
+    Lc, smax = d["ex_Lcomp"], v.sig_max
+    assert smax == pytest.approx(2 * r.fase1.forcas.F_N / Lc)
+    sa = smax * (1 - a / Lc)
+    M = sa * a**2 / 2 + (smax - sa) * a**2 / 3 - e.gam_c * e.h_sap * a**2 / 2
+    assert d["ex_M_pt"] == pytest.approx(M, rel=2e-3)
+    assert d["ex_face_pt"] == "inferior" and d["ex_face_tl"] == "superior"
+    assert d["ex_dAs_pt"] == 0.0 and d["ex_dAs_tl"] == 0.0 and r.dim.atende
+
+
+def test_excentricidade_na_faixa_com_armadura_insuficiente_reprova():
+    r = calcular(Entrada(**_FAIXA, ar_bi_phi=5.0, ar_bi_s=20.0, ar_bs_phi=5.0, ar_bs_s=20.0))
+    d = r.dim.v
+    assert r.fase1.verif.exc_faixa and not r.dim.atende and not r.atende
+    assert d["ex_dAs_pt"] == pytest.approx(d["ex_As_pt"] - d["dm_Abi"]) and d["ex_dAs_pt"] > 0
+    assert d["ex_dAs_tl"] == pytest.approx(d["ex_As_tl"] - d["dm_Abs"]) and d["ex_dAs_tl"] > 0
+    assert any("faltam" in n for n in r.dim.notas)
+
+
+def test_excentricidade_fora_da_faixa():
+    dentro = calcular(Entrada(b_talao=1.2)).fase1.verif                     # e/B < 1/6
+    assert dentro.ok_exc and not dentro.exc_faixa and dentro.frac_comp == 1.0
+    acima = calcular(Entrada(b_talao=0.7)).fase1.verif                      # e/B > 1/4
+    assert acima.R_eB > 0.25 and not acima.ok_exc and not acima.exc_faixa and not acima.exc_aceita
+    geo5 = calcular(Entrada(b_talao=0.8, eB_lim=0.333)).fase1.verif         # limite já acima de B/4
+    assert geo5.ok_exc and not geo5.exc_faixa
+
+
+def test_estudo_de_solo_preenche_alfa():
+    from core.perfil import Estrato, equivalente
+    a = Estrato(0, 1, "Argila", 6, 17, 19, 22, 6.0, 14, False, 2 / 3)
+    b = Estrato(1, 3, "Areia", 12, 18, 20, 32, 0.0, 22, False, 0.0)
+    eq = equivalente((a, b))
+    assert eq.alfa * eq.c == pytest.approx((2 / 3 * 6.0 * 1 + 0) / 3)        # preserva a adesão média

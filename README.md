@@ -68,7 +68,7 @@ core/                   BACKEND — não importa streamlit
 ui/                     inputs · painel · graficos · armacao (desenho das armaduras) · estudo_solo · estado
 io_/                    projeto (JSON) · excel (importar/exportar) · memorial (PDF) · sondagem (ler PDF)
 tools/                  gerar_campos.py · gerar_cenarios.py
-tests/                  178 testes
+tests/                  184 testes
 ROTEIRO_IA.md           contexto, decisões e pendências para quem (ou qual IA) for continuar o projeto
 ```
 
@@ -116,6 +116,14 @@ print(r.fase1.verif.R_FSt, r.fase1.verif.R_FSd, r.atende_estabilidade, r.dim.ate
 - **Verificações extras**: cortante no talão e espaçamento máximo das barras principais.
 - **Resistência frontal na cortina em balanço**: ação favorável, entra com fator 1,0 nos esforços
   de cálculo (a planilha a multiplica por γf).
+- **Padrões de deslizamento** (decisão de 16/11/2026): δb = 3/4·φ (planilha 2/3), adesão a = α·c com
+  α por tipo de solo (`core/solos.py`: 0 em areias e siltes sem argila, 0,5 em solos argilosos, 2/3
+  em argila mole a média, NAVFAC DM-7.2 na condição não drenada; 0,5 sem tipo definido; planilha 0)
+  e resistência em repouso do solo da frente (planilha: nenhuma). `core.planilha.PADROES_PLANILHA`
+  devolve os padrões da planilha.
+- **Excentricidade entre B/6 e B/4**: a planilha reprova; o aplicativo aceita se a base resistir à
+  distribuição triangular de tensões (descolamento parcial): As e cortante de ponta e talão e área
+  comprimida ≥ 2/3 (NBR 6122 7.6.2). Acima de B/4 reprova.
 - **Ancoragem sob a ponta**: a força das estacas não é descontada do momento nem do cortante da
   ponta (a planilha desconta). É resistência passiva, mobilizada por inteiro só na ruptura; o GEO5
   também não a desconta.

@@ -11,6 +11,7 @@ import pytest
 
 from core.fases import calcular
 from core.models import Entrada
+from core.planilha import PADROES_PLANILHA
 
 MURO = dict(H_muro=3.25, h_sap=0.25, t_topo=0.2, t_base=0.2, b_ponta=1.5, b_talao=0.0, D_frente=0.6,
             solo_ponta=True, q_sc=10, gam_at=20, gsat_at=20, phi_at=30, c_at=5, delta_est=10, gam_f=20, gsat_f=20,
@@ -72,7 +73,7 @@ def test_dimensionamento_da_haste_e_do_avanco(geo5):
 def test_criterios_padrao_do_aplicativo_sao_mais_conservadores(geo5):
     """O que separa 0,58 de 1,26 no deslizamento são critérios, não o modelo."""
     def fsd(**mud):
-        return calcular(Entrada(**{**MURO, **mud})).fase1.verif.R_FSd
+        return calcular(Entrada(**{**MURO, **PADROES_PLANILHA, **mud})).fase1.verif.R_FSd
     assert fsd() == pytest.approx(0.58, abs=0.006)                                     # δb = 2/3·φ, sem adesão
     assert fsd(k_phi=1.0) == pytest.approx(0.92, abs=0.006)                            # δb = φ
     assert fsd(k_phi=1.0, k_c=1.0) == pytest.approx(1.15, abs=0.006)                   # + adesão c·B'

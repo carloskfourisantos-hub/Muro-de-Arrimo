@@ -37,7 +37,8 @@ with c2:
         {"Parâmetro": "Ângulo de atrito φ" + ("' (drenado)" if eh_argila else ""), "Faixa": faixa(cl.phi), "Un.": "°"},
         {"Parâmetro": "Coesão c" + ("' (drenado)" if eh_argila else ""), "Faixa": faixa(cl.c), "Un.": "kPa"},
         {"Parâmetro": "δ / φ (atrito solo-estrutura)", "Faixa": faixa(cl.delta_phi, 2), "Un.": "-"},
-        {"Parâmetro": "Ligação limite / adesão", "Faixa": faixa(cl.adesao), "Un.": "kPa"},
+        {"Parâmetro": "Ligação limite / adesão (estacas e tirantes)", "Faixa": faixa(cl.adesao), "Un.": "kPa"},
+        {"Parâmetro": "α da adesão base-solo (a = α·c)", "Faixa": num(s.alfa, 2), "Un.": "-"},
         {"Parâmetro": "Capacidade de carga última indicativa", "Faixa": faixa(cl.qult), "Un.": "kPa"},
     ]
     if cl.su:
@@ -61,13 +62,14 @@ with a1:
                            phi_at=round(s.phi, 1), c_at=round(s.c, 1), delta_est=round(s.delta, 1),
                            beta_t=min(ent.beta_t, round(s.phi, 1)))
 with a2:
-    st.markdown(f"**Como solo de fundação:** γf = {num(s.gama, 1)} · φf = {num(s.phi, 1)} · cf = {num(s.c, 1)}")
+    st.markdown(f"**Como solo de fundação:** γf = {num(s.gama, 1)} · φf = {num(s.phi, 1)} · cf = {num(s.c, 1)} · "
+                f"α = {num(s.alfa, 2)} (adesão a = {num(s.alfa * s.c, 1)} kPa)")
     if st.button("Aplicar à fundação", width="stretch"):
         ent, _ = estado.entrada_atual()
         if ent is not None:
             st.session_state["_aplicado"] = "fundação"
             estado.aplicar(ent, gam_f=round(s.gama, 1), gsat_f=max(ent.gsat_f, round(s.gama, 1)),
-                           phi_f=round(s.phi, 1), c_f=round(s.c, 1))
+                           phi_f=round(s.phi, 1), c_f=round(s.c, 1), k_c=round(s.alfa, 2))
 if "_aplicado" in st.session_state:
     st.success(f"Parâmetros aplicados ao solo de {st.session_state.pop('_aplicado')}. Abra a página "
                "“Verificação NBR 11682” para ver o resultado. O peso específico saturado só foi ajustado se "

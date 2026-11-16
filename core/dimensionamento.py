@@ -20,7 +20,7 @@ from .empuxo import SEM_NA, k_mazindrani
 from .enums import (LimiteXd, MetodoEmpuxo, ModeloCortante, ModeloLajeCF, MomentoPonta, PesoNA, PosicaoContraforte,
                     PressaoLaje, ResFrontal, Subpressao, TensaoDim, TipoEmpuxo)
 from .geometria import TOL, Geometria
-from .verificacoes import INF, tensoes_lineares
+from .verificacoes import EB_FAIXA, INF, tensoes_lineares
 
 OK, NAO_OK, NA = "OK", "NÃO OK", "—"
 N_SECOES, N_FATIAS, N_BASE = 20, 100, 40
@@ -442,6 +442,60 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
         if e.cf_Lb < b_cf - 0.05:
             notas.append("O contraforte não cobre toda a largura da base desse lado: a laje da base foi "
                          "calculada como se cobrisse; a faixa além do contraforte trabalha em balanço.")
+    # ---- excentricidade entre o limite e B/4: base com descolamento parcial (distribuição triangular)
+    fases_faixa = [f for f in ((f1, f2) if trav else (f1,)) if f.verif.exc_faixa]
+    v["ex_faixa"] = bool(fases_faixa)
+    if fases_faixa:
+        # esforços com a distribuição linear sem tração, qualquer que seja a opção de tensão para dimensionar
+        Mp = Vp = Mt = Vt = 0.0          # envoltória; M com sinal do maior módulo
+        for f in fases_faixa:
+            V_ = f.verif
+            q_ = _sigma_base(xb, f.forcas.F_N, V_.R_e, V_.R_Bef, V_.R_sef, B, False) + usub - w_sap - carga_tal
+            m, s = ponta(q_) if tem_ponta else (0.0, 0.0)
+            Mp, Vp = (m if abs(m) > abs(Mp) else Mp), max(Vp, abs(s))
+            m, s = talao(q_, f.emp) if tem_talao else (0.0, 0.0)
+            Mt, Vt = (m if abs(m) > abs(Mt) else Mt), max(Vt, abs(s))
+        pior = max(fases_faixa, key=lambda f: f.verif.R_eB).verif
+        L_comp = pior.frac_comp * B
+        # ponta: M > 0 traciona a face inferior; talão: M > 0 traciona a face superior
+        inf_, sup_ = ("inferior", Abi, db_i), ("superior", Abs_, db_s)
+        fp, Ap, dp_ = inf_ if Mp >= 0 else sup_
+        ft, At, dt_ = sup_ if Mt >= 0 else inf_
+        As_p, As_t = c.as_nec(gf * abs(Mp), dp_), c.as_nec(gf * abs(Mt), dt_)
+        falta = lambda nec, ef: 0.0 if 0 <= nec <= ef else (nec - ef if nec > 0 else math.nan)  # noqa: E731
+        v.update(ex_eB=pior.R_eB, ex_frac=pior.frac_comp, ex_Lcomp=L_comp, ex_Ldesc=B - L_comp,
+                 ex_sig_max=pior.sig_max, ex_M_pt=Mp, ex_M_tl=Mt, ex_MSd_pt=gf * abs(Mp), ex_MSd_tl=gf * abs(Mt),
+                 ex_As_pt=As_p, ex_As_tl=As_t, ex_dAs_pt=falta(As_p, Ap), ex_dAs_tl=falta(As_t, At),
+                 ex_face_pt=fp, ex_face_tl=ft, ex_VSd_pt=gf * Vp, ex_VSd_tl=gf * Vt)
+        rot = "Base com descolamento (e entre o limite e B/4)"
+        extras += [
+            Check(f"{rot}: área comprimida ≥ 2/3 da base (NBR 6122 7.6.2)", 2 / 3, pior.frac_comp,
+                  _st_max(2 / 3, pior.frac_comp), Bs, True, "-"),
+            Check(f"{rot} — ponta, face {fp}: As ef ≥ As nec", As_p, Ap,
+                  _st_as(As_p, Ap) if (tem_ponta and pt_on) else NA, Bs, True, "cm²/m"),
+            Check(f"{rot} — ponta: VSd ≤ VRd", gf * Vp, vrd(Ap, dp_),
+                  _st_max(gf * Vp, vrd(Ap, dp_)) if (tem_ponta and pt_on) else NA, Bs, True, "kN/m"),
+            Check(f"{rot} — talão, face {ft}: As ef ≥ As nec", As_t, At,
+                  _st_as(As_t, At) if (tem_talao and tl_on) else NA, Bs, True, "cm²/m"),
+            Check(f"{rot} — talão: VSd ≤ VRd", gf * Vt, vrd(At, dt_),
+                  _st_max(gf * Vt, vrd(At, dt_)) if (tem_talao and tl_on) else NA, Bs, True, "kN/m"),
+        ]
+        fm = lambda x, n=2: f"{x:.{n}f}".replace(".", ",")  # noqa: E731
+        def txt_falta(d_, face):
+            if d_ != d_:
+                return f"a seção não resiste (aumente a espessura da sapata) na face {face}"
+            return (f"faltam {fm(d_)} cm²/m na face {face}" if d_ > 0
+                    else f"a armadura adotada na face {face} é suficiente")
+        notas.append(
+            f"Excentricidade e/B = {fm(pior.R_eB, 3)}, entre o limite ({fm(e.eB_lim, 3)}) e B/4: a resultante sai do "
+            f"núcleo central e a base descola em {fm(B - L_comp)} m do lado oposto à tensão máxima (comprimidos "
+            f"{fm(L_comp)} m = {fm(100 * pior.frac_comp, 0)} % de B; σmáx = {fm(pior.sig_max, 1)} kPa). O solo não "
+            "resiste à tração (NBR 6122 7.6.2), então a base foi verificada com a distribuição triangular: "
+            f"ponta, MSd = {fm(gf * abs(Mp), 1)} kN·m/m, As nec = {fm(max(As_p, 0))} cm²/m — "
+            f"{txt_falta(v['ex_dAs_pt'], fp)}; talão, MSd = {fm(gf * abs(Mt), 1)} kN·m/m, As nec = "
+            f"{fm(max(As_t, 0))} cm²/m — {txt_falta(v['ex_dAs_tl'], ft)}. O trecho descolado do talão trabalha "
+            "sem reação do solo, carregado pelo peso do aterro e pelo peso próprio. Acima de B/4 o muro é "
+            "reprovado; prefira aumentar a base quando o descolamento ocorrer sob cargas permanentes.")
     fora = lambda f: f.forcas.F_N > 0 and abs(f.verif.R_e) >= B / 2   # noqa: E731
     base_invalida = fora(f1) or (trav and fora(f2))
     if base_invalida:

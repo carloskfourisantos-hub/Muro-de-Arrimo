@@ -59,6 +59,41 @@ MISTOS = {
 }
 TIPOS = list(TABELAS) + list(MISTOS)
 
+# ------------------------------------------------------------------ adesão base-solo: a = α·c
+# Nenhuma norma brasileira fixa α (a NBR 11682 e a NBR 6122 não tratam do assunto). Critério adotado:
+#  · Das (Principles of Foundation Engineering): atrito e adesão na base como k1·φ e k2·c, com k1 e k2
+#    usualmente entre 1/2 e 2/3;
+#  · NAVFAC DM-7.2 (tabela de atrito e adesão entre materiais diferentes): a razão adesão/coesão cai com a
+#    consistência — ≈ 1,0 até c = 24 kPa; 1,0 → 0,75 até 48; 0,75 → 0,47 até 96; 0,47 → 0,32 até 192 kPa;
+#  · EN 1997-1 (6.5.3): em condição drenada despreza c'; em condição não drenada usa cu na área comprimida.
+# Coesão de areias e siltes sem argila é aparente (sucção/cimentação) e se perde com a saturação: α = 0.
+ALFA_SEM_ARGILA = 0.0
+ALFA_ARGILOSO = 0.5            # limite inferior de Das: solos mistos com argila e argilas rijas a duras
+ALFA_ARGILA_PLASTICA = 2 / 3   # limite superior de Das: argila muito mole a média (molda-se à base)
+_ALFA_MISTO = {"Argila siltosa": None, "Argila arenosa": ALFA_ARGILOSO, "Silte arenoso": ALFA_SEM_ARGILA,
+               "Silte argiloso": ALFA_ARGILOSO, "Areia argilosa": ALFA_ARGILOSO, "Areia siltosa": ALFA_SEM_ARGILA}
+_NAVFAC = ((0.0, 1.0), (24.0, 1.0), (48.0, 0.75), (96.0, 0.47), (192.0, 0.32))   # (c em kPa, adesão/c)
+
+
+def alfa_nao_drenado(su: float) -> float:
+    """Razão adesão/Su pela tabela do NAVFAC DM-7.2 (interpolação linear entre as faixas de consistência)."""
+    for (c0, a0), (c1, a1) in zip(_NAVFAC, _NAVFAC[1:]):
+        if su <= c1:
+            return a0 + (a1 - a0) * (su - c0) / (c1 - c0)
+    return _NAVFAC[-1][1]
+
+
+def alfa_adesao(tipo: str, nspt: float, nao_drenado: bool = False, su: float = 0.0) -> float:
+    """α da adesão base-solo (a = α·c) para o tipo de solo e a consistência."""
+    base = MISTOS[tipo][0] if tipo in MISTOS else tipo
+    if base == "Argila" and nao_drenado:
+        return alfa_nao_drenado(su)
+    if tipo in MISTOS and _ALFA_MISTO[tipo] is not None:
+        return _ALFA_MISTO[tipo]
+    if base != "Argila":
+        return ALFA_SEM_ARGILA
+    return ALFA_ARGILA_PLASTICA if classificar(tipo, nspt).nome in ("Muito mole", "Mole", "Média") else ALFA_ARGILOSO
+
 NOTAS = {
     "Argila": "Su = 10 × NSPT (Teixeira & Godoy, 1996). φ' não é função direta do NSPT: confirme com ensaio "
               "triaxial quando a obra justificar. Para escavações e contenções provisórias em argila mole, "
@@ -102,6 +137,7 @@ class Sugestao:
     adesao: float
     qult: float
     obs: tuple[str, ...]
+    alfa: float = 0.0     # adesão base-solo: a = α·c
 
 
 def sugerir(tipo: str, nspt: float, postura: float = 0.0, nao_drenado: bool = False) -> Sugestao:
@@ -123,7 +159,8 @@ def sugerir(tipo: str, nspt: float, postura: float = 0.0, nao_drenado: bool = Fa
         c = c * k if op == "x" else (c + k if op == "+" else k)
         delta = dphi * phi + d_delta
         obs.append(NOTAS["misto"])
-    return Sugestao(tipo, cl, gama, phi, c, max(0.0, delta), val(cl.adesao), val(cl.qult), tuple(obs))
+    return Sugestao(tipo, cl, gama, phi, c, max(0.0, delta), val(cl.adesao), val(cl.qult), tuple(obs),
+                    alfa_adesao(tipo, nspt, nao_drenado, c))
 
 
 def correlacoes(nspt: float) -> dict[str, float]:

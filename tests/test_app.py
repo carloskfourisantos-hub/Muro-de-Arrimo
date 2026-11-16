@@ -22,11 +22,11 @@ def test_inicio():
     assert at.title[0].value == "Muro de arrimo"
 
 
-def test_verificacao_padrao_reproduz_a_planilha():
+def test_verificacao_padrao():
     at = _pagina("verificacao")
     texto = " ".join(m.value for m in at.markdown)
-    assert "4,03" in texto and "1,09" in texto and "6,59" in texto      # FSt, FSd, FScc do exemplo
-    assert "Estabilidade externa (NBR 11682): NÃO ATENDE" in texto
+    assert "4,04" in texto and "1,53" in texto and "6,91" in texto      # FSt, FSd, FScc do exemplo
+    assert "Estabilidade externa (NBR 11682): ATENDE" in texto
     assert "Dimensionamento estrutural (NBR 6118): ATENDE" in texto
 
 

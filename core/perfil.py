@@ -126,6 +126,7 @@ class Estrato:
     c: float         # kPa
     delta: float     # ° (atrito solo-estrutura)
     aterro: bool = False
+    alfa: float = 0.0   # adesão base-solo: a = α·c (core.solos.alfa_adesao)
 
     @property
     def espessura(self) -> float:
@@ -148,7 +149,7 @@ def estratos(furo: Furo, z_ini: float, z_fim: float, postura: float = 0.0, sem_c
             continue
         s = solos.sugerir(c.tipo, c.nspt, postura, nao_drenado)
         saida.append(Estrato(topo, base, c.tipo, c.nspt, s.gama, s.gama + GAMA_SAT_MAIS, s.phi,
-                             0.0 if (sem_coesao and not nao_drenado) else s.c, s.delta, c.aterro))
+                             0.0 if (sem_coesao and not nao_drenado) else s.c, s.delta, c.aterro, s.alfa))
         if c.aterro:
             avisos.append(f"{c.topo:.2f}–{c.base:.2f} m é ATERRO: correlações com NSPT são pouco confiáveis nele.")
     coberto = sum(e.espessura for e in saida)
@@ -169,11 +170,14 @@ def equivalente(est: tuple[Estrato, ...], criterio: str = MEDIA) -> Estrato | No
     if criterio == DESFAVORAVEL:
         return Estrato(topo, base, min(est, key=lambda e: e.phi).tipo, min(e.nspt for e in est),
                        max(e.gama for e in est), max(e.gsat for e in est), min(e.phi for e in est),
-                       min(e.c for e in est), min(e.delta for e in est), any(e.aterro for e in est))
+                       min(e.c for e in est), min(e.delta for e in est), any(e.aterro for e in est),
+                       min(e.alfa for e in est))
     m = lambda f: sum(f(e) * e.espessura for e in est) / h   # noqa: E731
     phi = math.degrees(math.atan(m(lambda e: math.tan(math.radians(e.phi)))))
     return Estrato(topo, base, max(est, key=lambda e: e.espessura).tipo, m(lambda e: e.nspt), m(lambda e: e.gama),
-                   m(lambda e: e.gsat), phi, m(lambda e: e.c), m(lambda e: e.delta), any(e.aterro for e in est))
+                   m(lambda e: e.gsat), phi, m(lambda e: e.c), m(lambda e: e.delta), any(e.aterro for e in est),
+                   # α equivalente preserva a adesão média α·c
+                   m(lambda e: e.alfa * e.c) / m(lambda e: e.c) if m(lambda e: e.c) > 0 else m(lambda e: e.alfa))
 
 
 # ------------------------------------------------------------ esforço lateral
@@ -267,7 +271,7 @@ def propor(furo: Furo, z_ini: float, z_fim: float, largura_base: float = 3.0, q:
         avisos.append("Nenhuma camada com parâmetros no trecho do muro: o solo arrimado não foi alterado.")
     if fun_eq:
         campos.update(gam_f=round(fun_eq.gama, 1), gsat_f=round(fun_eq.gsat, 1), phi_f=round(fun_eq.phi, 1),
-                      c_f=round(fun_eq.c, 1))
+                      c_f=round(fun_eq.c, 1), k_c=round(fun_eq.alfa, 2))
     else:
         avisos.append("Nenhuma camada com parâmetros abaixo do fundo da sapata: o solo de fundação não foi "
                       "alterado.")

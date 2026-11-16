@@ -8,6 +8,7 @@ import pytest
 
 from core.fases import calcular
 from core.models import Entrada
+from core.planilha import PADROES_PLANILHA
 from core.solver import base_minima, estabilidade_ok, estudo_parametrico, menor_valor, sugerir_armaduras
 from io_ import excel, memorial, projeto
 from ui import graficos
@@ -27,7 +28,8 @@ def test_projeto_json_ida_e_volta():
 
 @pytest.mark.skipif(not PLANILHA.exists(), reason="planilha de origem ausente")
 def test_importar_planilha_original_reproduz_o_padrao():
-    assert excel.importar(PLANILHA) == Entrada().resolvida()
+    # a planilha traz os padrões dela (δb = 2/3·φ, sem adesão, sem resistência frontal), não os do aplicativo
+    assert excel.importar(PLANILHA) == Entrada(**PADROES_PLANILHA).resolvida()
 
 
 def test_exportar_xlsx():
@@ -55,7 +57,7 @@ def test_graficos_nao_falham(mud):
 
 
 def test_ferramentas():
-    e = Entrada()                               # exemplo da planilha: reprova no deslizamento
+    e = Entrada(**PADROES_PLANILHA)             # exemplo da planilha: reprova no deslizamento
     assert not estabilidade_ok(calcular(e))
     v, r = menor_valor(e, "b_talao", 8.0)
     assert v > e.b_talao and estabilidade_ok(r)

@@ -151,7 +151,7 @@ def travamento_minimo_exato(entrada, tol: float = 1e-3) -> TravamentoExato:
     res = calcular(base.com(trav_F=Fmin))
     v = res.fase2.verif
     obs = ""
-    if not v.ok_exc:
+    if not v.exc_aceita:
         obs = ("Com essa força a resultante sai do núcleo da base (e/B = %.3f): trave também a base "
                "em vez de aumentar a reação no topo." % v.R_eB)
     elif not v.ok_cap:

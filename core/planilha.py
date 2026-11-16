@@ -14,6 +14,9 @@ from .fases import Fase, Resultado
 # aplicativo são outros: bloco alinhado ao tardoz e cortina como placa com borda livre).
 MODO_PLANILHA = {"bl_pos": "Centrado nas estacas (planilha)", "laje_cf": "Coeficientes do GEO5 (planilha)"}
 
+# Padrões da planilha nos campos em que o aplicativo adota outro padrão (decisão de 16/11/2026).
+PADROES_PLANILHA = {"k_phi": 0.666666666666667, "k_c": 0.0, "ff_tipo": "Nenhuma"}
+
 FS_SENTINELA = 999.0
 SIG_SENTINELA = 10000.0
 

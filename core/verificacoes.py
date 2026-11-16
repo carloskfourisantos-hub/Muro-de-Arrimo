@@ -16,6 +16,9 @@ from .forcas import Forcas
 from .geometria import Geometria
 
 INF = math.inf
+# Faixa de tolerância da excentricidade: acima do limite (padrão B/6) e até B/4 a base descola em parte;
+# o muro só é aceito se a base for dimensionada para a distribuição triangular de tensões.
+EB_FAIXA = 0.25
 
 
 @dataclass(frozen=True)
@@ -66,10 +69,18 @@ class Verificacoes:
     R_qult: float
     R_FScc: float
     ok_cap: bool
+    # campos só do aplicativo
+    exc_faixa: bool = False     # limite < e/B ≤ 1/4: aceita se a base resistir com o descolamento
+    frac_comp: float = 1.0      # fração comprimida da base (distribuição linear sem tração)
 
     @property
     def verificacoes_ok(self) -> bool:
-        return self.ok_tomb and self.ok_desl and self.ok_exc and self.ok_cap
+        return self.ok_tomb and self.ok_desl and self.exc_aceita and self.ok_cap
+
+    @property
+    def exc_aceita(self) -> bool:
+        """Dentro do limite, ou na faixa até B/4 (condicionada às verificações da base no dimensionamento)."""
+        return self.ok_exc or self.exc_faixa
 
 
 def tensoes_lineares(N: float, e: float, B: float) -> tuple[float, float]:
@@ -151,4 +162,6 @@ def calcular_verificacoes(e, g: Geometria, F: Forcas) -> Verificacoes:
         F.fase, FSt, FSt >= e.FSt_min,
         Hact, delta_b, adesao, H_atr, H_ade, H_ext, H_est, Hres, FSd, FSd >= e.FSd_min,
         xR, exc, eB, eB <= e.eB_lim, Bef, smax, smin, "ponta" if exc >= 0 else "talão", sef,
-        cap, qult, FScc, FScc >= e.FScc_min)
+        cap, qult, FScc, FScc >= e.FScc_min,
+        exc_faixa=F.F_N > 0 and e.eB_lim + 1e-9 < eB <= EB_FAIXA + 1e-9,
+        frac_comp=min(1.0, max(0.0, 3 * (0.5 - eB))) if F.F_N > 0 else 0.0)

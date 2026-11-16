@@ -62,6 +62,21 @@ SO_APP = {
     ],
 }
 
+# Padrões do aplicativo diferentes dos da planilha (decisão do projetista em 16/11/2026).
+# Chave = campo; valor = (padrão do aplicativo, texto de ajuda).
+PADRAO_APP = {
+    "k_phi": (0.75, "Padrão 3/4 (concreto moldado contra o solo). A planilha usa 2/3; a literatura indica de 1/2 a "
+                    "2/3 (Das) até 1,0 (GEO5)"),
+    "k_c": (0.5, "α da adesão a = α·c. Padrão 0,5 (solo coesivo sem tipo definido). Por tipo de solo: areias e "
+                 "siltes sem argila 0; solos argilosos 0,5; argila mole a média 2/3; não drenado, α pela "
+                 "resistência Su (NAVFAC DM-7.2). As páginas de solo preenchem este valor. A planilha usa 0"),
+    "ff_tipo": ("Em repouso", "Padrão: 'Em repouso' = K0·σ' com K0 = 1 − sen φf, na altura D. Só conte com esse "
+                              "solo se ele não puder ser escavado ou erodido; senão use 'Nenhuma' (planilha)"),
+    "eB_lim": (None, "Padrão B/6 (resultante no terço médio, base 100% comprimida). Entre esse limite e B/4 o "
+                     "aplicativo aceita o muro se a base resistir à distribuição triangular de tensões "
+                     "(descolamento parcial); acima de B/4 reprova. GEO5 usa 0,333 por padrão"),
+}
+
 # campos cujo padrão é "igual a outro campo" (fórmula na planilha)
 VINCULO = {"delta_dv": "phi_at", "gw_f": "gf_f", "gf_cs": "gf_f"}
 INTEIROS = {"anc_n1", "anc_n2", "cf_n"}
@@ -104,6 +119,10 @@ def main() -> None:
             tipo, padrao = "int", int(valor)
         else:
             tipo, padrao = "float", float(valor)
+        if nome in PADRAO_APP:
+            pad_app, ajuda = PADRAO_APP[nome]
+            if pad_app is not None:
+                padrao = pad_app
         vinculo = VINCULO.get(nome)
         if isinstance(bruto, str) and bruto.startswith("=") and vinculo:
             padrao = None  # None = segue o campo vinculado

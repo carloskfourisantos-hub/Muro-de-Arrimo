@@ -105,13 +105,17 @@ def gerar_pdf(res: Resultado, meta: dict | None = None) -> bytes:
     lin("FS ao tombamento", [fs(f.verif.R_FSt) for f in fases], f"≥ {num(e.FSt_min)}", [f.verif.ok_tomb for f in fases])
     lin("FS ao deslizamento", [fs(f.verif.R_FSd) for f in fases], f"≥ {num(e.FSd_min)}",
         [f.verif.ok_desl for f in fases])
-    lin("Excentricidade e/B", [num(f.verif.R_eB, 3) for f in fases], f"≤ {num(e.eB_lim, 3)}",
-        [f.verif.ok_exc for f in fases])
+    lin("Excentricidade e/B", [num(f.verif.R_eB, 3) for f in fases], f"≤ {num(e.eB_lim, 3)}" + (" (até 0,250*)" if any(f.verif.exc_faixa for f in fases) else ""),
+        [f.verif.exc_aceita for f in fases])
     lin("FS à capacidade de carga", [fs(f.verif.R_FScc) for f in fases], f"≥ {num(e.FScc_min)}",
         [f.verif.ok_cap for f in fases])
     larg = [6.2] + [2.6] * len(fases) + [2.6, 2.6]
     el.append(Spacer(1, 4))
     el.append(_tabela(dados, larg))
+    if any(f.verif.exc_faixa for f in fases):
+        el.append(Paragraph("* Excentricidade entre o limite e B/4: aceita somente com a base verificada à flexão "
+                            "para a distribuição triangular de tensões (descolamento parcial) — ver as verificações "
+                            "“Base com descolamento” e a nota correspondente no dimensionamento.", P))
     for f in fases:
         for a in f.avisos:
             el.append(Paragraph(f"<font color='#c02f2f'>Aviso (Fase {f.numero}):</font> {a.texto}", P))

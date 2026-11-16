@@ -33,9 +33,20 @@ PREMISSAS: dict[str, list[str]] = {
     ],
     "Verificações de estabilidade (ABNT NBR 11682)": [
         "Tombamento: FS = Mres / Movr ≥ 2,0.",
-        "Deslizamento: FS = (N·tan δb + a·B' + resistências horizontais) / H_act ≥ 1,5, com δb = kφ·φf e "
-        "a = kc·cf. Empuxo passivo na frente desprezado.",
+        "Deslizamento: FS = (N·tan δb + a·B' + resistências horizontais) / H_act ≥ 1,5, com δb = kφ·φf "
+        "(padrão kφ = 3/4) e adesão a = α·cf (campo kc = α).",
+        "α da adesão por tipo de solo (nenhuma norma brasileira fixa o valor): areias e siltes sem argila 0 — "
+        "coesão aparente, perdida na saturação; solos argilosos mistos e argilas rijas a duras 0,5; argila muito "
+        "mole a média 2/3 — faixa de 1/2 a 2/3 de Das; condição não drenada (c = Su): razão adesão/coesão do "
+        "NAVFAC DM-7.2 (1,0 até 24 kPa, caindo a 0,32 em 192 kPa). Sem tipo de solo definido: 0,5. A EN 1997-1 "
+        "despreza c' na condição drenada: use α = 0 para esse critério.",
+        "Solo na frente do muro: resistência em repouso K0·σ' na altura D (padrão), somada à resistência. Empuxo "
+        "passivo desprezado. Só vale se esse solo não puder ser escavado nem erodido.",
         "Excentricidade: e = B/2 − (Mres − Movr)/N; limite padrão e ≤ B/6 (base inteiramente comprimida).",
+        "Entre o limite e B/4 a base descola em parte (75 % comprimidos em e = B/4). O solo não resiste à tração "
+        "e a NBR 6122 (7.6.2) exige ao menos 2/3 da área comprimida; nessa faixa o muro é aceito se ponta e talão "
+        "resistirem, à flexão e ao cortante, à distribuição triangular de tensões — o talão descolado fica sem "
+        "reação do solo. Acima de B/4 reprova.",
         "Tensões: distribuição linear (triangular se e > B/6) e tensão média de Meyerhof em B' = B − 2|e|.",
         "Capacidade de carga: Vesic, sapata corrida, com B', fatores de inclinação e sem fatores de "
         "profundidade; FS = qult / σef ≥ 3,0.",
@@ -85,6 +96,12 @@ DIFERENCAS_DA_PLANILHA: list[str] = [
     "valor exato recalculando a Fase 2.",
     "Resistência do solo da frente no dimensionamento da cortina em balanço: é ação favorável e entra com "
     "fator 1,0 (NBR 8681); a planilha a multiplica por γf. Os esforços de cálculo ficam um pouco maiores.",
+    "Padrões diferentes dos da planilha: atrito base-solo δb = 3/4·φ (planilha: 2/3), adesão a = α·c com "
+    "α = 0,5 ou conforme o tipo de solo (planilha: 0) e resistência em repouso do solo da frente (planilha: "
+    "nenhuma). Um arquivo da planilha importado mantém os valores dela.",
+    "Excentricidade entre o limite e B/4: a planilha reprova; o aplicativo aceita se a base, verificada com a "
+    "distribuição triangular de tensões (descolamento parcial), tiver armadura e cortante suficientes e a área "
+    "comprimida for ≥ 2/3 (NBR 6122 7.6.2).",
     "Ancoragem na base sob a ponta: a força das estacas não é descontada do momento nem do cortante da ponta "
     "(a planilha desconta). É resistência passiva, mobilizada por inteiro só na ruptura; o GEO5 também não a "
     "desconta. Os esforços da ponta ficam maiores.",

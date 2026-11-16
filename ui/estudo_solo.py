@@ -151,12 +151,16 @@ def render() -> None:
         st.dataframe(pd.DataFrame(linhas), hide_index=True, width="stretch")
         st.markdown(f"**Solo de fundação** (de {num(z_fim)} m até ≈ 1,5·B abaixo)")
         linhas = [{"Camada (m)": f"{num(e.topo)} – {num(e.base)}", "Solo": e.tipo, "NSPT": num(e.nspt, 1),
-                   "γ": num(e.gama, 1), "φ (°)": num(e.phi, 1), "c (kPa)": num(e.c, 1)} for e in prop.fundacao]
+                   "γ": num(e.gama, 1), "φ (°)": num(e.phi, 1), "c (kPa)": num(e.c, 1), "α adesão": num(e.alfa, 2)}
+                  for e in prop.fundacao]
         if prop.fundacao_eq:
             e = prop.fundacao_eq
             linhas.append({"Camada (m)": "ADOTADO", "Solo": "", "NSPT": num(e.nspt, 1), "γ": num(e.gama, 1),
-                           "φ (°)": num(e.phi, 1), "c (kPa)": num(e.c, 1)})
+                           "φ (°)": num(e.phi, 1), "c (kPa)": num(e.c, 1), "α adesão": num(e.alfa, 2)})
         st.dataframe(pd.DataFrame(linhas), hide_index=True, width="stretch")
+        st.caption("α adesão: fração da coesão contada como adesão base-solo no deslizamento (a = α·c). "
+                   "Areias e siltes sem argila: 0; solos argilosos: 0,5; argila mole a média: 2/3; "
+                   "não drenado: pela resistência Su (NAVFAC DM-7.2).")
         if prop.por_camadas:
             cam = prop.por_camadas
             m = st.columns(3)

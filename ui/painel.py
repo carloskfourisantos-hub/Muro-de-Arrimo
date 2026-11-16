@@ -44,16 +44,28 @@ def resumo(res: Resultado) -> None:
     st.page_link("paginas/dimensionamento.py", label="Abrir o dimensionamento e o desenho das armaduras",
                  icon=":material/construction:")
     pior = lambda attr, f=min: f(getattr(x.verif, attr) for x in fases)  # noqa: E731
+    na_faixa = any(f.verif.exc_faixa for f in fases)
     cols = st.columns(4)
     itens = [
         ("FS tombamento", fs(pior("R_FSt")), f"mín. {num(e.FSt_min)}", all(f.verif.ok_tomb for f in fases)),
         ("FS deslizamento", fs(pior("R_FSd")), f"mín. {num(e.FSd_min)}", all(f.verif.ok_desl for f in fases)),
-        ("Excentricidade e/B", num(pior("R_eB", max), 3), f"máx. {num(e.eB_lim, 3)}",
-         all(f.verif.ok_exc for f in fases)),
+        ("Excentricidade e/B", num(pior("R_eB", max), 3),
+         f"máx. {num(e.eB_lim, 3)}" + (" · até 0,250 com base verificada" if na_faixa else ""),
+         all(f.verif.exc_aceita for f in fases)),
         ("FS capacidade de carga", fs(pior("R_FScc")), f"mín. {num(e.FScc_min)}", all(f.verif.ok_cap for f in fases)),
     ]
     for col, (t, v, lim, ok) in zip(cols, itens):
         col.markdown(cartao(t, v, lim, ok), unsafe_allow_html=True)
+    if na_faixa:
+        d = res.dim.v
+        falta = [f"{rot}: faltam {num(d[k])} cm²/m na face {d[fc]}" if d[k] == d[k] else f"{rot}: seção insuficiente"
+                 for rot, k, fc in (("ponta", "ex_dAs_pt", "ex_face_pt"), ("talão", "ex_dAs_tl", "ex_face_tl"))
+                 if d[k] != 0]
+        st.warning(f"Excentricidade entre o limite ({num(e.eB_lim, 3)}) e B/4: a base descola em "
+                   f"{num(d['ex_Ldesc'])} m ({num(100 * d['ex_frac'], 0)} % de B comprimidos). A excentricidade só é aceita "
+                   "porque a base foi verificada à flexão com a distribuição triangular de tensões — "
+                   + ("a armadura adotada na base é suficiente." if not falta else "; ".join(falta) + ".")
+                   + " Detalhes nas verificações “Base com descolamento” do dimensionamento.")
     if res.tem_fase2:
         st.caption("Com travamento: os cartões mostram o pior valor entre a Fase 1 (construtiva) e a Fase 2 "
                    "(muro travado).")
@@ -102,7 +114,10 @@ def secao_resultados(res: Resultado) -> None:
             all(v.ok_desl for v in V), "-"),
         lin("Posição da resultante xR", [num(v.R_xR, 3) for v in V], "", None, "m"),
         lin("Excentricidade e = B/2 − xR", [num(v.R_e, 3) for v in V], "", None, "m"),
-        lin("e / B", [num(v.R_eB, 3) for v in V], f"≤ {num(e.eB_lim, 3)}", all(v.ok_exc for v in V), "-"),
+        lin("e / B", [num(v.R_eB, 3) for v in V], f"≤ {num(e.eB_lim, 3)}" + (" (até 0,250 com base verificada)" if any(v.exc_faixa for v in V) else ""),
+            all(v.exc_aceita for v in V), "-"),
+        lin("Fração comprimida da base (linear, sem tração)", [num(100 * v.frac_comp, 0) + " %" for v in V],
+            "", None, "-"),
         lin("Base efetiva B'", [num(v.R_Bef, 3) for v in V], "", None, "m"),
         lin("Tensão máxima σmáx (linear)", [num(v.sig_max, 1, "fora da base") + f" ({v.sig_max_em})" for v in V],
             "", None, "kPa"),
