@@ -228,3 +228,60 @@ def test_contrafortes_dimensionamento(geo5_cf):
     assert sit["Base entre contrafortes: As inferior ≥ As nec"] == "NÃO OK"       # como no GEO5
     assert sit["Base entre contrafortes: As superior ≥ As nec"] == "NÃO OK"
     assert sit["Base entre contrafortes: VSd ≤ VRd (senão, estribos)"] == "NÃO OK"
+
+
+# ---------------------------------------------------------------------------------------------------
+# Quarto caso de referência: memorial do GEO5 de 16/11/2026, muro com talão e cunha de terra inclinada.
+# Cortina 0,30 × 3,00 m, sapata 1,90 × 0,30 m (ponta 0,80 m, talão 0,80 m), estacas de 0,40 m × 8 m a cada
+# 3 m em x = 0,95 m, C20, ϕ16 c/ 15, Rd = 150 kPa. Geometria deduzida dos pesos do memorial.
+MURO_TALAO = dict(H_muro=3.30, h_sap=0.30, t_topo=0.3, t_base=0.3, b_ponta=0.8, b_talao=0.8, D_frente=0.6,
+                  solo_ponta=True, q_sc=10, gam_at=20, gsat_at=20, phi_at=30, c_at=5, delta_est=10, gam_f=20,
+                  gsat_f=20, phi_f=30, c_f=5, fck_c=20, ar_tz_phi=16, ar_tz_s=15.0, ar_bi_phi=16, ar_bi_s=15.0,
+                  ar_bs_phi=16, ar_bs_s=15.0, anc_usar=True, anc_x=0.95, anc_n1=1, anc_n2=0, anc_L=8,
+                  anc_d=0.4, anc_esp=3.0, anc_a=20, anc_FS=1.5, anc_ds=25, anc_fy=500)
+CRITERIOS_TALAO = {**CRITERIOS_GEO5, "FSt_min": 2.0, "FSd_min": 1.5, "qult_inf": 150,
+                   "ponta_mod": "Pressões na base"}
+
+
+@pytest.fixture(scope="module")
+def geo5_talao():
+    return calcular(Entrada(**MURO_TALAO, **CRITERIOS_TALAO))
+
+
+def test_talao_cunha_inclinada_estabilidade(geo5_talao):
+    emp, F, v = geo5_talao.fase1.emp, geo5_talao.fase1.forcas, geo5_talao.fase1.verif
+    assert emp.p_Pah_s == pytest.approx(24.25, abs=0.01)          # tardoz + plano inclinado (δ = φ) + sapata
+    assert emp.p_Pav_s == pytest.approx(32.76, abs=0.01)
+    assert emp.p_Pah_q == pytest.approx(8.60, abs=0.01)
+    assert emp.p_Pav_q == pytest.approx(9.03, abs=0.01)
+    pesos = {f.nome: f for f in F.linhas}
+    assert pesos["Solo sobre o talão (γ natural)"].Fz == pytest.approx(11.08, abs=0.01)   # cunha de terra
+    assert pesos["Solo sobre o talão (γ natural)"].x == pytest.approx(1.37, abs=0.005)
+    assert pesos["Peso da cortina"].Fz + pesos["Peso da sapata"].Fz == pytest.approx(36.75, abs=0.01)
+    assert F.F_N == pytest.approx(139.11, abs=0.02)
+    assert F.F_Mres == pytest.approx(158.48, abs=0.02)
+    assert F.F_Movr == pytest.approx(31.83, abs=0.02)
+    assert v.R_FSt == pytest.approx(4.98, abs=0.006)
+    assert v.R_Hres == pytest.approx(89.42, abs=0.02)
+    assert v.R_Hact == pytest.approx(31.05, abs=0.01)
+    assert v.R_FSd == pytest.approx(2.88, abs=0.006)
+    assert v.R_eB == pytest.approx(0.021, abs=0.0006)
+    assert v.R_sef == pytest.approx(76.40, abs=0.05)
+    assert v.R_FScc == pytest.approx(1.96, abs=0.006)
+    assert v.ok_tomb and v.ok_desl and v.ok_exc and v.ok_cap      # mesmo veredito do GEO5
+
+
+def test_talao_cunha_inclinada_dimensionamento(geo5_talao):
+    d = geo5_talao.dim.v
+    assert d["dm_MSdp"] == pytest.approx(94.35, rel=0.002)
+    assert d["dm_VSd"] == pytest.approx(83.49, rel=0.002)
+    assert d["dm_Asnp"] * 100 == pytest.approx(881.4, rel=0.002)
+    assert d["dm_Ast"] * 100 == pytest.approx(1341.1, rel=0.001)
+    assert d["dm_VRd"] == pytest.approx(173.71, rel=0.001)
+    assert d["dm_MRd_pt"] == pytest.approx(138.77, rel=0.001)     # avanço: sem força normal, coincide
+    assert d["dm_MRdp"] == pytest.approx(139.60, rel=0.007) and d["dm_MRdp"] < 139.60   # haste: GEO5 soma N
+    # cortante do avanço: a combinação de ações favoráveis reproduz o GEO5; o aplicativo adota a envoltória
+    assert d["dm_VSd_pt_fav"] == pytest.approx(59.05, rel=0.035) and d["dm_VSd_pt"] >= 59.05
+    # diferença NÃO explicada: momento do avanço 67,68 kN·m/m no GEO5 × 30,9 pelas pressões na base.
+    # Com 'Igual à cortina (GEO5)' o aplicativo usa o momento da haste (94,5), acima do GEO5.
+    assert d["dm_MSd_pt"] == pytest.approx(30.86, abs=0.05)
