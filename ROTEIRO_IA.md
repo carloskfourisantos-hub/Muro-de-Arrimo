@@ -5,7 +5,7 @@ Leia-o inteiro antes de mexer em qualquer coisa. O estado técnico detalhado est
 [README.md](README.md); o plano original, em [PLANEJAMENTO.md](PLANEJAMENTO.md) (histórico — não é
 mais a referência).
 
-Situação em 13/11/2026: aplicativo completo e funcionando, **174 testes passando**.
+Situação em 16/11/2026: aplicativo completo e funcionando, **178 testes passando**.
 
 ---
 
@@ -34,6 +34,7 @@ concreto armado (ABNT NBR 11682) e dimensionamento estrutural (ABNT NBR 6118), p
 | 13/11/2026 | Muro com contrafortes: cortina e base como **laje com três bordas engastadas e uma livre**, armada nas duas direções; o método do GEO5 virou opção legada |
 | 13/11/2026 | Dimensionamento em **página própria**, com desenho da seção e indicação de bitola e espaçamento de cada armadura |
 | 13/11/2026 | Resistência do solo da frente é ação favorável: entra com fator **1,0** no dimensionamento da cortina (a planilha multiplica por γf) |
+| 16/11/2026 | Ancoragem (estacas) sob a ponta **não é descontada** do momento nem do cortante da ponta (a planilha desconta; o GEO5 não) |
 
 Regra derivada: todo novo desvio em relação à planilha tem de ser (a) registrado em
 `core/premissas.py` (`DIFERENCAS_DA_PLANILHA`), (b) descrito no README e (c) coberto por teste.
@@ -70,7 +71,7 @@ core/             campos.py (GERADO) · enums.py · models.py · geometria.py ·
 ui/               estado.py · inputs.py · painel.py · graficos.py · armacao.py · estudo_solo.py · formato.py
 io_/              projeto.py (JSON) · excel.py · memorial.py (PDF) · sondagem.py (leitura do PDF de SPT)
 tools/            gerar_campos.py · gerar_cenarios.py
-tests/            9 arquivos, 174 testes; tests/data/cenarios.json é a referência do Excel
+tests/            9 arquivos, 178 testes; tests/data/cenarios.json é a referência do Excel
 ```
 
 Cadeia de cálculo (funções puras, sem iteração):
@@ -147,12 +148,13 @@ Lista completa e atualizada em `core/premissas.py` e no README. Resumo:
 - fck > 40 MPa: ηc e, acima de 50 MPa, parâmetros do grupo II;
 - verificações extras: cortante no talão e espaçamento máximo das barras;
 - resistência frontal com fator 1,0 na cortina;
+- ancoragem sob a ponta não alivia os esforços da ponta;
 - laje com borda livre no muro com contrafortes;
 - bloco de coroamento alinhado ao tardoz;
 - FS e tensão infinitos no lugar das sentinelas; comparações com tolerância 1e-9.
 
 Nos testes de paridade (`tests/test_paridade_planilha.py`) essas diferenças aparecem como exceções
-nomeadas (`_BASE`, `_FRONTAL`). **Não alargue a tolerância (1e-8) para fazer um teste passar**:
+nomeadas (`_BASE`, `_FRONTAL`, `_ANCORAGEM`). **Não alargue a tolerância (1e-8) para fazer um teste passar**:
 ou é erro de porte, ou é um desvio novo que precisa ser decidido com o projetista.
 
 Defeitos da própria planilha (já comunicados): `Resumo!C35` usa `CONCAT`, inexistente no Excel do
@@ -176,7 +178,13 @@ Caso de referência em `tests/test_geo5.py`: muro sem talão, cortina 0,20 × 3,
 
 Com os critérios do GEO5 selecionados, o aplicativo reproduz N, Mres, Movr, Hres, Hact, e/B e σ.
 
-Diferenças que permanecem, todas com o aplicativo a favor da segurança:
+Segundo caso de referência (16/11/2026, no mesmo arquivo): muro com ancoragem na base, cortina
+0,20 × 2,50 m, sapata 0,80 × 0,20 m, C20. Estabilidade e armaduras reproduzidas. Cortante da ponta:
+GEO5 46,01 (γf só no empuxo, excentricidade recalculada, sem descontar a ancoragem) × aplicativo
+70,75 (γf em toda a reação de serviço). MRd da haste com x/d = 0,28: GEO5 64,36 × aplicativo 64,67
+(+0,5 %, único ponto em que o aplicativo fica acima); na ponta, com x/d < 0,259, os dois coincidem.
+
+Diferenças que permanecem, com o aplicativo a favor da segurança salvo indicação:
 
 - momento resistente da cortina: 100,5 × 101,75 kN·m/m. Hipótese **não confirmada**: o GEO5 soma a
   força normal ou a armadura comprimida;
@@ -207,7 +215,7 @@ Proponha antes de fazer; a decisão é do projetista.
    ou **entrada/saída** (`io_/`).
 2. Se envolver a planilha, releia as células envolvidas com `openpyxl` (fórmulas e valores) antes
    de escrever código.
-3. Rode `pytest` antes de começar, para confirmar os 174 testes verdes.
+3. Rode `pytest` antes de começar, para confirmar os 178 testes verdes.
 4. Faça a mudança no núcleo primeiro, com teste; só depois a interface.
 5. Se o resultado passar a diferir da planilha, pare e classifique: erro de porte (corrija) ou
    desvio deliberado (registre em `premissas.py`, no README e como exceção nomeada na paridade).

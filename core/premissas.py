@@ -47,7 +47,8 @@ PREMISSAS: dict[str, list[str]] = {
         "Flexão simples com diagrama retangular; As mín pela Tabela 17.3 (ρmín·b·h); x/d ≤ 0,45; cisalhamento "
         "VRd1 de lajes sem armadura transversal (19.4.1). Esforços característicos × γf.",
         "Ponta e talão em balanço a partir das faces da cortina, com as tensões da verificação de estabilidade "
-        "(Fases 1 e 2), subpressão, peso próprio e estacas.",
+        "(Fases 1 e 2), subpressão e peso próprio. Estacas sob o talão aumentam os esforços do talão; estacas "
+        "sob a ponta não aliviam os da ponta.",
         "Muro com contrafortes: cortina e base entre contrafortes como laje com três bordas engastadas e uma "
         "livre (placa por elementos finitos, momentos nas duas direções) e contraforte como viga em balanço. "
         "Opção legada: coeficientes do GEO5 (M vertical = 0,03·σH·H1·l; M horizontal = σp·l²/12 nos apoios e "
@@ -84,6 +85,9 @@ DIFERENCAS_DA_PLANILHA: list[str] = [
     "valor exato recalculando a Fase 2.",
     "Resistência do solo da frente no dimensionamento da cortina em balanço: é ação favorável e entra com "
     "fator 1,0 (NBR 8681); a planilha a multiplica por γf. Os esforços de cálculo ficam um pouco maiores.",
+    "Ancoragem na base sob a ponta: a força das estacas não é descontada do momento nem do cortante da ponta "
+    "(a planilha desconta). É resistência passiva, mobilizada por inteiro só na ruptura; o GEO5 também não a "
+    "desconta. Os esforços da ponta ficam maiores.",
     "Muro com contrafortes: por padrão a cortina e a base entre contrafortes são calculadas como laje com três "
     "bordas engastadas e uma livre (placa por elementos finitos, ν = 0,2), com momentos e armadura nas duas "
     "direções; os coeficientes do GEO5 usados pela planilha ficam como opção legada.",

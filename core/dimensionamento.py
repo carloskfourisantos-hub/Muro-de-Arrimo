@@ -207,14 +207,14 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
     a = f1.forcas.anc
     Fe_m = a.anc_Fe / e.anc_esp if e.anc_usar else 0.0
     n1, n2, xe, x2 = e.anc_n1, e.anc_n2, a.anc_xe, e.anc_x2
-    anc_M_pt = (n1 * max(0.0, g.x_fb - xe) * (xe < g.x_fb) + n2 * max(0.0, g.x_fb - x2) * (x2 < g.x_fb)) * Fe_m
-    anc_V_pt = (n1 * (xe < g.x_fb) + n2 * (x2 < g.x_fb)) * Fe_m
+    # Ancoragem sob a ponta: é resistência passiva, que só se mobiliza por inteiro na ruptura. Descontá-la
+    # aliviaria o momento e o cortante da ponta; por isso não é descontada (a planilha desconta).
     anc_M_tl = (n1 * max(0.0, xe - g.x_tb) + n2 * max(0.0, x2 - g.x_tb)) * Fe_m
     anc_V_tl = (n1 * (xe > g.x_tb) + n2 * (x2 > g.x_tb)) * Fe_m
 
     def ponta(q):
-        return (float((eh_ponta * q * (g.x_fb - xb)).sum()) * dx - anc_M_pt,
-                float((eh_ponta * q).sum()) * dx - anc_V_pt)
+        return (float((eh_ponta * q * (g.x_fb - xb)).sum()) * dx,
+                float((eh_ponta * q).sum()) * dx)
 
     def talao(q, emp):
         pav_on = tem_talao and emp.p_xPav > g.x_tb

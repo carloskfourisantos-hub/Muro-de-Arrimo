@@ -29,6 +29,12 @@ _FRONTAL = ("dm_MSdp", "dm_Asnp", "dm_utp", "dm_VSd:", "dm_MSdn", "dm_Asnn", "dm
             "dm_geral") + tuple(f"chk_{r}_" for r in (6, 8, 10, 12, 16, 17))
 
 
+# Terceiro desvio DELIBERADO: a planilha desconta a força da ancoragem (estacas sob a ponta) do momento e
+# do cortante da ponta. A ancoragem é resistência passiva, mobilizada por inteiro só na ruptura; o
+# aplicativo não a desconta (como o GEO5), e os esforços da ponta ficam maiores.
+_ANCORAGEM = ("dm_MtP", "dm_VtP", "dm_Mtp", "dm_MSd_pt", "dm_As_pt", "dm_VSd_pt", "dm_geral") + tuple(
+    f"chk_{r}_" for r in (16, 17, 18, 19))
+
 @pytest.mark.parametrize("cenario", CENARIOS, ids=[c["nome"] for c in CENARIOS])
 def test_paridade(cenario):
     dif, sem, n = comparar(cenario)
@@ -43,6 +49,12 @@ def test_paridade(cenario):
         assert res.dim.v["dm_MSdp"] >= xl["dm_MSdp"] - 1e-9          # sempre a favor da segurança
         assert res.dim.v["dm_VSd"] >= xl["dm_VSd"] - 1e-9
         assert res.dim.v["dm_MSdp"] <= 1.02 * xl["dm_MSdp"]          # e por pouco
+    if ent["anc_usar"]:
+        dif = [d for d in dif if not d.startswith(_ANCORAGEM)]
+        xl = cenario["saidas"]
+        if not res.dim.base_invalida:
+            assert res.dim.v["dm_VtP"] >= xl["dm_VtP"] - 1e-9            # sempre a favor da segurança
+            assert res.dim.v["dm_MtP1"] >= xl["dm_MtP1"] - 1e-9
     assert not sem, f"nomes da planilha sem equivalente no núcleo: {sem}"
     assert n > 550
     assert not dif, f"{len(dif)} divergência(s) em {n} valores:\n  " + "\n  ".join(dif[:20])

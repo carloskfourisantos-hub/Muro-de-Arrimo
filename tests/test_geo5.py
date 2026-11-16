@@ -79,3 +79,81 @@ def test_criterios_padrao_do_aplicativo_sao_mais_conservadores(geo5):
     quase = fsd(k_phi=1.0, k_c=1.0, ff_tipo="Em repouso", conv_res="Descontar da ação (GEO5)")
     assert quase == pytest.approx(1.244, abs=0.003)                                    # + resistência frontal
     assert quase < geo5.fase1.verif.R_FSd                                              # falta só o Pa,v da sobrecarga
+
+
+# ---------------------------------------------------------------------------------------------------
+# Segundo caso de referência: memorial do GEO5 de 16/11/2026, muro com ancoragem na base.
+# Cortina 0,20 × 2,50 m, sapata 0,80 × 0,20 m (ponta de 0,60 m, sem talão), mesmo solo, q = 10 kPa,
+# estacas de 0,40 m × 5 m a cada 3 m em x = 0,40 m (a = 20 kPa, SFe = 1,5, barra de 25 mm), C20,
+# ϕ12,5 c/ 12 na haste (8,33/m) e ϕ12,5 c/ 13,3 no avanço (7,50/m).
+MURO_ANC = dict(H_muro=2.70, h_sap=0.20, t_topo=0.2, t_base=0.2, b_ponta=0.6, b_talao=0.0, D_frente=0.6,
+                solo_ponta=True, q_sc=10, gam_at=20, gsat_at=20, phi_at=30, c_at=5, delta_est=10, gam_f=20,
+                gsat_f=20, phi_f=30, c_f=5, fck_c=20, ar_tz_phi=12.5, ar_tz_s=12.0, ar_bi_phi=12.5,
+                ar_bi_s=100 / 7.5, anc_usar=True, anc_x=0.4, anc_n1=1, anc_n2=0, anc_L=5, anc_d=0.4,
+                anc_esp=3.0, anc_a=20, anc_FS=1.5, anc_ds=25, anc_fy=500)
+CRITERIOS_ANC = {**CRITERIOS_GEO5, "FSt_min": 2.0, "FSd_min": 1.5}
+
+
+@pytest.fixture(scope="module")
+def geo5_anc():
+    return calcular(Entrada(**MURO_ANC, **CRITERIOS_ANC))
+
+
+def test_ancoragem_empuxo_e_forcas(geo5_anc):
+    emp, F = geo5_anc.fase1.emp, geo5_anc.fase1.forcas
+    assert emp.p_Pah_s == pytest.approx(10.35, abs=0.01)
+    assert emp.p_Pah_q == pytest.approx(6.37, abs=0.01)
+    assert emp.p_Pav == pytest.approx(1.82 + 1.45, abs=0.01)
+    assert emp.p_Rff == pytest.approx(1.80, abs=0.005)
+    pesos = {f.nome: f for f in F.linhas}
+    assert pesos["Peso da cortina"].Fz + pesos["Peso da sapata"].Fz == pytest.approx(16.50, abs=0.01)
+    assert pesos["Solo sobre a ponta"].Fz == pytest.approx(4.80, abs=0.005)
+    assert pesos["Ancoragem na base — 1ª linha de estacas"].Fz == pytest.approx(27.93, abs=0.01)
+    assert F.anc.anc_Tp == pytest.approx(83.78, abs=0.01)         # arrancamento por estaca
+    assert F.anc.anc_Rt == pytest.approx(163.62, abs=0.01)        # barra
+    assert F.F_N == pytest.approx(52.51, abs=0.02)
+
+
+def test_ancoragem_estabilidade(geo5_anc):
+    F, v = geo5_anc.fase1.forcas, geo5_anc.fase1.verif
+    assert F.F_Mres == pytest.approx(25.57, abs=0.02)
+    assert F.F_Movr == pytest.approx(12.71, abs=0.02)
+    assert v.R_FSt == pytest.approx(2.01, abs=0.006)
+    assert v.R_Hres == pytest.approx(32.77, abs=0.02)
+    assert v.R_Hact == pytest.approx(14.92, abs=0.015)
+    assert v.R_FSd == pytest.approx(2.20, abs=0.006)
+    assert v.R_eB == pytest.approx(0.194, abs=0.0006)
+    assert v.R_sef == pytest.approx(107.14, abs=0.1)
+    assert v.R_FScc == pytest.approx(0.93, abs=0.006)
+    assert v.ok_tomb and v.ok_desl and v.ok_exc and not v.ok_cap       # mesmo veredito do GEO5
+
+
+def test_ancoragem_dimensionamento(geo5_anc):
+    d = geo5_anc.dim.v
+    assert d["dm_MSdp"] == pytest.approx(58.15, rel=0.002)
+    assert d["dm_VSd"] == pytest.approx(60.40, rel=0.002)
+    assert d["dm_Asnp"] * 100 == pytest.approx(906.7, rel=0.002)
+    assert d["dm_Ast"] * 100 == pytest.approx(1022.2, rel=0.001)
+    assert d["dm_VRd"] == pytest.approx(108.57, rel=0.001)
+    assert d["dm_MSd_pt"] == pytest.approx(58.15, rel=0.002)      # avanço: igual à haste
+    assert d["dm_As_pt"] * 100 == pytest.approx(906.7, rel=0.002)
+    assert d["dm_MRd_pt"] == pytest.approx(58.93, rel=0.001)      # x/d < 0,259: coincide
+    assert d["dm_VRd_pt"] == pytest.approx(108.57, rel=0.001)
+    # diferenças conhecidas:
+    assert d["dm_MRdp"] == pytest.approx(64.36, rel=0.006)        # haste com x/d = 0,28 > 0,259: GEO5 0,5 % menor
+    # cortante do avanço: nenhum dos dois desconta a ancoragem. GEO5 = 46,01 (γf só no empuxo, excentricidade
+    # recalculada); aplicativo = γf em toda a reação de serviço, mais conservador.
+    assert d["dm_VSd_pt"] == pytest.approx(70.75, abs=0.05) and d["dm_VSd_pt"] > 46.01
+
+
+def test_ancoragem_nao_alivia_a_ponta():
+    """A força da ancoragem sob a ponta não reduz o momento nem o cortante da ponta."""
+    base = {**MURO_ANC, **CRITERIOS_ANC, "ponta_mod": "Pressões na base"}
+    def ponta(**mud):
+        d = calcular(Entrada(**{**base, **mud})).dim.v
+        return d["dm_MtP1"], d["dm_VtP"]
+    M, V = ponta()
+    assert V == pytest.approx(70.75 / 1.4, abs=0.05)
+    # com o dobro da adesão a reação do solo aumenta; os esforços da ponta não podem diminuir
+    M2, V2 = ponta(anc_a=40)
+    assert M2 >= M and V2 >= V

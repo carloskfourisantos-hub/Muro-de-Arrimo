@@ -68,7 +68,7 @@ core/                   BACKEND — não importa streamlit
 ui/                     inputs · painel · graficos · armacao (desenho das armaduras) · estudo_solo · estado
 io_/                    projeto (JSON) · excel (importar/exportar) · memorial (PDF) · sondagem (ler PDF)
 tools/                  gerar_campos.py · gerar_cenarios.py
-tests/                  174 testes
+tests/                  178 testes
 ROTEIRO_IA.md           contexto, decisões e pendências para quem (ou qual IA) for continuar o projeto
 ```
 
@@ -116,6 +116,9 @@ print(r.fase1.verif.R_FSt, r.fase1.verif.R_FSd, r.atende_estabilidade, r.dim.ate
 - **Verificações extras**: cortante no talão e espaçamento máximo das barras principais.
 - **Resistência frontal na cortina em balanço**: ação favorável, entra com fator 1,0 nos esforços
   de cálculo (a planilha a multiplica por γf).
+- **Ancoragem sob a ponta**: a força das estacas não é descontada do momento nem do cortante da
+  ponta (a planilha desconta). É resistência passiva, mobilizada por inteiro só na ruptura; o GEO5
+  também não a desconta.
 - **Muro com contrafortes**: cortina e base entre contrafortes como laje com três bordas engastadas
   e uma livre (`core/placa.py`, elementos finitos de placa, conferido contra as soluções clássicas),
   com armadura nas duas direções. Os coeficientes do GEO5 da planilha ficam como opção legada.
