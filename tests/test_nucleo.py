@@ -1,6 +1,8 @@
 """Modelo de entrada, soluções analíticas, invariantes físicos e NBR 6118."""
 import math
 
+import numpy as np
+
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -251,3 +253,93 @@ def test_estudo_de_solo_preenche_alfa():
     b = Estrato(1, 3, "Areia", 12, 18, 20, 32, 0.0, 22, False, 0.0)
     eq = equivalente((a, b))
     assert eq.alfa * eq.c == pytest.approx((2 / 3 * 6.0 * 1 + 0) / 3)        # preserva a adesão média
+
+
+# ------------------------------------------------ cargas em faixa, em linha e concentrada (Boussinesq)
+def _z(H, n=4000):
+    return (np.arange(n) + 0.5) * H / n
+
+
+def test_boussinesq_linha_resultante_de_terzaghi():
+    """Resultantes clássicas: 0,64·Q/(m² + 1) para m > 0,4 e 0,55·Q para m ≤ 0,4 (NAVFAC DM-7.2)."""
+    from core import boussinesq as bq
+    H, Q = 5.0, 80.0
+    for x in (2.5, 4.0, 7.5):
+        m = x / H
+        P = bq.s_linha(_z(H), Q, x, H).sum() * H / 4000
+        assert P == pytest.approx(2 / math.pi * Q / (m**2 + 1), rel=1e-4)
+    for x in (0.0, 1.0, 2.0):
+        assert bq.s_linha(_z(H), Q, x, H).sum() * H / 4000 == pytest.approx(0.549 * Q, rel=2e-3)
+    assert bq.s_linha(_z(H), Q, 3.0, H, 0.5).sum() == pytest.approx(0.5 * bq.s_linha(_z(H), Q, 3.0, H).sum())
+
+
+def test_boussinesq_faixa():
+    from core import boussinesq as bq
+    z = _z(4.0)
+    # faixa muito larga encostada no muro: metade de q na solução elástica, q na parede rígida
+    assert bq.s_faixa(z, 10.0, 0.0, 1e6, 0.5) == pytest.approx(np.full_like(z, 5.0), rel=1e-4)
+    assert bq.s_faixa(z, 10.0, 0.0, 1e6) == pytest.approx(np.full_like(z, 10.0), rel=1e-4)
+    # superposição: duas faixas contíguas = uma faixa com a largura somada
+    assert bq.s_faixa(z, 10, 1, 1) + bq.s_faixa(z, 10, 2, 2) == pytest.approx(bq.s_faixa(z, 10, 1, 3))
+    # faixa estreita tende à carga em linha (m > 0,4)
+    assert bq.s_faixa(z, 1000.0, 2.995, 0.01) == pytest.approx(bq.s_linha(z, 10.0, 3.0, 4.0), rel=1e-3)
+    assert (bq.s_faixa(z, 10, 1, 2) >= 0).all()
+
+
+def test_boussinesq_ponto():
+    from core import boussinesq as bq
+    H, P, z = 4.0, 100.0, _z(4.0)
+    assert bq.fator_planta(3.0, 0.01) == pytest.approx(1.0, abs=1e-4)          # seção em frente à carga
+    assert bq.fator_planta(3.0, 6.0) < bq.fator_planta(3.0, 3.0) < 1.0          # média cai com o comprimento
+    pico = bq.s_ponto(z, P, 2.0, H, 0.01)
+    n = z / H
+    assert pico == pytest.approx(1.77 * P / H**2 * 0.25 * n**2 / (0.25 + n**2) ** 3, rel=1e-3)
+    assert bq.s_ponto(z, P, 0.5, H, 3.0) == pytest.approx(bq.s_ponto(z, P, 1.6, H, 3.0))   # m ≤ 0,4: independe de m
+
+
+def test_cargas_concentradas_entram_na_estabilidade_e_na_cortina():
+    base = calcular(Entrada())
+    r = calcular(Entrada(sc_ln_Q=50.0, sc_ln_x=3.0))
+    c, F, F0 = r.fase1.forcas.conc, r.fase1.forcas, base.fase1.forcas
+    assert not F0.conc.ativo and len(F0.linhas) == 17 and len(F.linhas) == 18
+    assert c.Fh == pytest.approx(0.549 * 50.0, rel=3e-3)                       # 3,0 − talão 1,85 → m < 0,4
+    assert c.zF == pytest.approx(0.6 * c.H_est, abs=0.05)                      # resultante a ~0,6·H
+    assert F.F_Hact == pytest.approx(F0.F_Hact + c.Fh)
+    assert F.F_Movr == pytest.approx(F0.F_Movr + c.Fh * c.zF)
+    assert F.F_N == pytest.approx(F0.F_N)                                      # sem componente vertical
+    assert r.fase1.verif.R_FSd < base.fase1.verif.R_FSd and r.fase1.verif.R_FSt < base.fase1.verif.R_FSt
+    # cortina: momento na base aumenta do momento das pressões no tardoz (γf)
+    e, g = r.entrada, r.geo
+    y = r.dim.fatias["y"]
+    dM = (r.dim.fatias["sh_concentradas"] * (y - e.h_sap)).sum() * g.h_cort / len(y)
+    assert dM > 0
+    assert r.dim.v["dm_MSdp"] == pytest.approx(base.dim.v["dm_MSdp"] + e.gf_f * dM, rel=1e-9)
+    flex = calcular(Entrada(sc_ln_Q=50.0, sc_ln_x=3.0, sc_bq="Parede que se desloca (×1 — Boussinesq)"))
+    assert flex.fase1.forcas.conc.Fh == pytest.approx(c.Fh / 2)
+
+
+def test_cargas_sobre_o_talao():
+    e = Entrada(sc_fx_q=20.0, sc_fx_a=1.0, sc_fx_b=2.0, sc_pt_P=90.0, sc_pt_x=0.5, sc_pt_L=3.0)
+    r = calcular(e)
+    c = r.fase1.forcas.conc
+    talao = r.geo.B_base - r.geo.x_bt
+    assert c.W_talao == pytest.approx(20.0 * (talao - 1.0) + 90.0 / 3.0)
+    assert len(r.fase1.forcas.linhas) == 18                                    # peso não entra por padrão
+    r2 = calcular(e.com(q_estab=True))
+    assert len(r2.fase1.forcas.linhas) == 19
+    sem = calcular(e.com(sc_fx_q=0.0, sc_pt_P=0.0))
+    sem2 = calcular(e.com(sc_fx_q=0.0, sc_pt_P=0.0, q_estab=True))
+    assert r2.fase1.forcas.F_N == pytest.approx(sem2.fase1.forcas.F_N + c.W_talao, rel=1e-9)
+    # o talão é dimensionado com o peso das cargas que estão sobre ele
+    assert r.dim.base["carga_talao"].max() == pytest.approx(sem.dim.base["carga_talao"].max() + c.W_talao / e.b_talao)
+
+
+def test_cargas_concentradas_na_interface_e_no_memorial():
+    from io_ import memorial
+    from ui import graficos
+    import matplotlib.pyplot as plt
+    r = calcular(Entrada(sc_fx_q=20.0, sc_ln_Q=30.0, sc_ln_x=2.5, sc_pt_P=100.0, sc_pt_x=9.0))
+    for fig in (graficos.croqui(r, 1), graficos.grafico_concentradas(r)):
+        plt.close(fig)
+    assert memorial.gerar_pdf(r, {"nome": "teste"})[:4] == b"%PDF"
+    assert any("Boussinesq" in n for n in r.dim.notas)

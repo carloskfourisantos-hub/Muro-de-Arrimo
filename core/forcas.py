@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from .empuxo import Empuxo
 from .enums import ConvResistentes, ConvTravamento, PesoNA, PosicaoBloco, PosicaoContraforte, Subpressao
+from .boussinesq import calcular_concentradas
 from .geometria import TOL, Geometria
 
 
@@ -51,6 +52,7 @@ class Forcas:
     F_Hres_ext: float
     F_Htrav: float
     anc: Ancoragem
+    conc: object = None      # core.boussinesq.Concentradas (cargas em faixa, linha e ponto)
 
 
 def calcular_ancoragem(e, g: Geometria) -> Ancoragem:
@@ -142,10 +144,18 @@ def calcular_forcas(e, g: Geometria, emp: Empuxo, fase: int = 1) -> Forcas:
                  "Peso do bloco por metro de muro"),
         Forca("Subpressão na base", 0.0, U, emp.p_xUsub, 0.0, 0.0, -U * emp.p_xUsub, "Distribuição linear", "agua"),
     )
+    # cargas em faixa, em linha e concentradas (só no aplicativo): linhas extras, depois das 17 da planilha
+    conc = calcular_concentradas(e, g)
+    if conc.ativo:
+        linhas += (Forca("Cargas em faixa, linha e ponto — empuxo (Boussinesq)", conc.Fh, 0.0, B, conc.zF, 0.0,
+                         conc.Fh * conc.zF, "Horizontal, sem atrito; soma-se ao empuxo de terra"),)
+        if e.q_estab and conc.W_talao > 0:
+            linhas += (vertical("Cargas em faixa, linha e ponto sobre o talão (peso)", conc.W_talao, conc.xW,
+                                g.z_ter, "Somente se a sobrecarga sobre o talão for estabilizante"),)
     Hnet = sum(f.Fx for f in linhas)
     N = sum(f.Fz for f in linhas)
     Mres = sum(f.Mres for f in linhas)
     Movr = sum(f.Movr for f in linhas)
     Hact = sum(f.Fx for f in linhas if f.Fx > 0)
     Hres_ext = -sum(f.Fx for f in linhas if f.Fx < 0) - F_trav
-    return Forcas(fase, linhas, Hnet, N, Mres, Movr, Hact, Hres_ext, F_trav, anc)
+    return Forcas(fase, linhas, Hnet, N, Mres, Movr, Hact, Hres_ext, F_trav, anc, conc)

@@ -133,11 +133,16 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
         s_fr = np.where(y < e.D_frente, K0f * e.gam_f * (e.D_frente - y), 0.0)
     else:
         s_fr = np.zeros_like(y)
+    # cargas em faixa, em linha e concentradas (Boussinesq): somam-se ao empuxo, ativo ou em repouso
+    conc = f1.forcas.conc
+    sh_bq = conc.na_cortina(e, g, y) if conc is not None else np.zeros_like(y)
+    sh_rep, sh_at = sh_rep + sh_bq, sh_at + sh_bq
     sh_dim = sh_rep if rep_dim else sh_at
     dFA = (sh_dim + u - s_fr) * dy
     dFB = (sh_rep + u - s_fr) * dy
     dFs, dFw, dFf = sh_dim * dy, u * dy, s_fr * dy
-    fatias = dict(y=y, prof=D, sz=sz, u=u, sh_repouso=sh_rep, sh_ativo=sh_at, s_frente=s_fr, dFA=dFA, dFB=dFB)
+    fatias = dict(y=y, prof=D, sz=sz, u=u, sh_repouso=sh_rep, sh_ativo=sh_at, s_frente=s_fr, dFA=dFA, dFB=dFB,
+                  sh_concentradas=sh_bq)
 
     # ----------------------------------------------------------- 21 seções da cortina
     j = np.arange(N_SECOES + 1)
@@ -196,7 +201,8 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
     larg_q = max(0.0, B - g.x_bt if g.cv == 1 else g.x_P - g.x_bt)
     d_gam = (e.gsat_at - e.gam_w - e.gam_at) if e.peso_na == PesoNA.SUBMERSO else (e.gsat_at - e.gam_at)
     tem_talao, tem_ponta = e.b_talao > TOL, e.b_ponta > TOL
-    w_tal = (e.gam_at * g.solo.A + d_gam * g.solo_na.A + e.q_sc * larg_q) / e.b_talao if tem_talao else 0.0
+    W_conc = conc.W_talao if conc is not None else 0.0     # cargas em faixa/linha/ponto sobre o talão
+    w_tal = (e.gam_at * g.solo.A + d_gam * g.solo_na.A + e.q_sc * larg_q + W_conc) / e.b_talao if tem_talao else 0.0
     eh_ponta, eh_talao = xb < g.x_fb, xb > g.x_tb
     carga_tal = np.where(eh_talao, w_tal, 0.0) if tem_talao else np.zeros_like(xb)
     q1 = sig1 + usub - w_sap - carga_tal
@@ -496,6 +502,13 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
             f"{fm(max(As_t, 0))} cm²/m — {txt_falta(v['ex_dAs_tl'], ft)}. O trecho descolado do talão trabalha "
             "sem reação do solo, carregado pelo peso do aterro e pelo peso próprio. Acima de B/4 o muro é "
             "reprovado; prefira aumentar a base quando o descolamento ocorrer sob cargas permanentes.")
+    if conc is not None and conc.ativo:
+        notas.append("Cargas em faixa, em linha e concentrada: pressões pela teoria da elasticidade (Boussinesq, "
+                     "na forma de Terzaghi/NAVFAC), horizontais, somadas ao empuxo de terra e majoradas por γf. "
+                     "Resultante na estabilidade: " + f"{conc.Fh:.1f}".replace(".", ",") + " kN/m a "
+                     + f"{conc.zF:.2f}".replace(".", ",") + " m do fundo da sapata."
+                     + (" As pressões dessas cargas NÃO entram nas lajes entre contrafortes nem no contraforte: "
+                        "verifique-os à parte." if cf else ""))
     fora = lambda f: f.forcas.F_N > 0 and abs(f.verif.R_e) >= B / 2   # noqa: E731
     base_invalida = fora(f1) or (trav and fora(f2))
     if base_invalida:

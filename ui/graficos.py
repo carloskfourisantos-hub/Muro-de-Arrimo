@@ -166,8 +166,31 @@ def croqui(res, fase: int = 1, forcas: bool = True, largura: float = 7.2):
     if e.q_sc > 0:
         ax.text((g.x_bt + xr) / 2, (g.z_ter + z_r) / 2 + 0.12, f"q = {num(e.q_sc, 1)} kPa", fontsize=7.5,
                 color=TINTA2, ha="center", va="bottom", zorder=5)
+    # cargas em faixa, em linha e concentrada (posições a partir do tardoz, na superfície do terreno)
+    tb = math.tan(math.radians(e.beta_t))
+    zt = lambda d: g.z_ter + d * tb                      # noqa: E731
+    topo_cargas = 0.0
+    def _carga(d, texto, nivel):
+        nonlocal topo_cargas
+        x = min(g.x_bt + d, xr - 0.05)
+        fora = g.x_bt + d > xr - 0.05
+        _seta(ax, (x, zt(x - g.x_bt) + 0.45), (x, zt(x - g.x_bt) + 0.02), LARANJA)
+        ax.text(x, zt(x - g.x_bt) + 0.50 + 0.17 * nivel, texto + (" →" if fora else ""), fontsize=7, color=TINTA2,
+                ha="center", va="bottom", zorder=8)
+        topo_cargas = max(topo_cargas, zt(x - g.x_bt) + 0.70 + 0.17 * nivel)
+    if e.sc_fx_q > 0:
+        x0, x1 = min(g.x_bt + e.sc_fx_a, xr - 0.05), min(g.x_bt + e.sc_fx_a + e.sc_fx_b, xr)
+        ax.fill([x0, x1, x1, x0], [zt(x0 - g.x_bt), zt(x1 - g.x_bt), zt(x1 - g.x_bt) + 0.14, zt(x0 - g.x_bt) + 0.14],
+                color=LARANJA, alpha=0.75, lw=0, zorder=6)
+        ax.text((x0 + x1) / 2, zt((x0 + x1) / 2 - g.x_bt) + (0.36 if e.q_sc > 0 else 0.18), f"faixa {num(e.sc_fx_q, 1)} kPa", fontsize=7,
+                color=TINTA2, ha="center", va="bottom", zorder=8)
+        topo_cargas = max(topo_cargas, zt(x1 - g.x_bt) + 0.60)
+    if e.sc_ln_Q > 0:
+        _carga(e.sc_ln_x, f"linha {num(e.sc_ln_Q, 1)} kN/m", 0)
+    if e.sc_pt_P > 0:
+        _carga(e.sc_pt_x, f"ponto {num(e.sc_pt_P, 1)} kN", 1)
     ax.set_xlim(xl - 0.05, xr + 0.9)
-    ax.set_ylim(z_fundo, max(H, z_r) + 0.55)
+    ax.set_ylim(z_fundo, max(H, z_r, topo_cargas - 0.55) + 0.55)
     ax.set_title(f"Fase {fase} — " + ("muro em balanço" if fase == 1 else "muro travado"), loc="left")
     fig.tight_layout(pad=0.4)
     return fig
@@ -364,5 +387,21 @@ def grafico_parametrico(linhas: list[dict], rotulo_x: str, limites: dict):
         ax.set_ylim(bottom=0)
     if len(fases) > 1:
         eixos[0].legend(fontsize=7)
+    fig.tight_layout(pad=0.5)
+    return fig
+
+
+def grafico_concentradas(res):
+    """Pressão horizontal das cargas em faixa, em linha e concentrada: plano da estabilidade e tardoz."""
+    c, g, e = res.fase1.forcas.conc, res.geo, res.entrada
+    fig, ax = plt.subplots(figsize=(4.6, 3.6), dpi=150)
+    ax.plot(c.sh_est, c.z_est, color=AZUL, label="plano pela extremidade do talão (estabilidade)")
+    y = np.linspace(e.h_sap, g.z_ter, 120)[:-1]
+    ax.plot(c.na_cortina(e, g, y), y, color=LARANJA, label="tardoz (dimensionamento da cortina)")
+    ax.axhline(c.zF, color=MUDO, lw=0.8, ls="--")
+    ax.set_xlabel("pressão horizontal (kPa)")
+    ax.set_ylabel("cota acima do fundo da sapata (m)")
+    ax.set_xlim(left=0)
+    ax.legend(fontsize=6.5, loc="upper right")
     fig.tight_layout(pad=0.5)
     return fig

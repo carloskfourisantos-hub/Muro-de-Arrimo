@@ -68,7 +68,7 @@ core/                   BACKEND — não importa streamlit
 ui/                     inputs · painel · graficos · armacao (desenho das armaduras) · estudo_solo · estado
 io_/                    projeto (JSON) · excel (importar/exportar) · memorial (PDF) · sondagem (ler PDF)
 tools/                  gerar_campos.py · gerar_cenarios.py
-tests/                  184 testes
+tests/                  190 testes
 ROTEIRO_IA.md           contexto, decisões e pendências para quem (ou qual IA) for continuar o projeto
 ```
 
@@ -124,6 +124,9 @@ print(r.fase1.verif.R_FSt, r.fase1.verif.R_FSd, r.atende_estabilidade, r.dim.ate
 - **Excentricidade entre B/6 e B/4**: a planilha reprova; o aplicativo aceita se a base resistir à
   distribuição triangular de tensões (descolamento parcial): As e cortante de ponta e talão e área
   comprimida ≥ 2/3 (NBR 6122 7.6.2). Acima de B/4 reprova.
+- **Cargas em faixa, em linha e concentrada** no terrapleno (`core/boussinesq.py`): pressões de
+  Boussinesq na forma de Terzaghi/NAVFAC, com opção de parede rígida (×2, padrão) ou que se desloca.
+  Nove campos só do aplicativo (`sc_fx_*`, `sc_ln_*`, `sc_pt_*`, `sc_bq`). Não existem na planilha.
 - **Ancoragem sob a ponta**: a força das estacas não é descontada do momento nem do cortante da
   ponta (a planilha desconta). É resistência passiva, mobilizada por inteiro só na ruptura; o GEO5
   também não a desconta.
@@ -132,7 +135,7 @@ print(r.fase1.verif.R_FSt, r.fase1.verif.R_FSd, r.atende_estabilidade, r.dim.ate
   com armadura nas duas direções. Os coeficientes do GEO5 da planilha ficam como opção legada.
 - **Blocos de coroamento**: face do bloco alinhada ao tardoz por padrão (a planilha centra o bloco
   nas estacas); o projetista pode escolher "centrado nas estacas" ou informar a posição.
-- Três campos existem só no aplicativo (`bl_pos`, `bl_x`, `laje_cf`). Para reproduzir a planilha,
+- Doze campos existem só no aplicativo (`bl_pos`, `bl_x`, `laje_cf` e os nove `sc_*`). Para reproduzir a planilha,
   use `core.planilha.MODO_PLANILHA` — é o que os testes de paridade fazem.
 - Comparações de limite com tolerância 1e-9.
 

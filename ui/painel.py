@@ -201,6 +201,26 @@ def secao_empuxo(res: Resultado) -> None:
                    f"{res.entrada.modo_cunha.value}")
     with c2:
         _fig(graficos.diagrama_empuxo(res, fase.numero))
+    conc = fase.forcas.conc
+    if conc is not None and conc.ativo:
+        e = res.entrada
+        st.markdown("**Cargas em faixa, em linha e concentrada (Boussinesq)**")
+        k1, k2 = st.columns([2, 3], gap="large")
+        with k1:
+            _tabela([
+                {"Grandeza": "Carga em faixa", "Valor": num(conc.Fh_faixa), "Un.": "kN/m"},
+                {"Grandeza": "Carga em linha", "Valor": num(conc.Fh_linha), "Un.": "kN/m"},
+                {"Grandeza": "Carga concentrada (média no comprimento)", "Valor": num(conc.Fh_ponto), "Un.": "kN/m"},
+                {"Grandeza": "Resultante horizontal", "Valor": num(conc.Fh), "Un.": "kN/m"},
+                {"Grandeza": "Cota da resultante", "Valor": num(conc.zF), "Un.": "m"},
+                {"Grandeza": "Altura do plano de cálculo", "Valor": num(conc.H_est), "Un.": "m"},
+                {"Grandeza": "Peso das cargas sobre o talão", "Valor": num(conc.W_talao), "Un.": "kN/m"},
+            ])
+            st.caption(f"{e.sc_bq.value}. Na estabilidade as distâncias são contadas a partir do plano vertical "
+                       "pela extremidade do talão; carga sobre o talão é tratada como encostada nesse plano. No "
+                       "dimensionamento da cortina, a partir do tardoz.")
+        with k2:
+            _fig(graficos.grafico_concentradas(res))
     with st.expander("Tabela de fatias da integração (auditoria)"):
         t = emp.fatias
         df = pd.DataFrame({

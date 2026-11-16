@@ -44,6 +44,27 @@ LIM = {
 # Campos que só existem no aplicativo (sem célula na planilha). Chave = campo da planilha
 # depois do qual entram; valor = lista de (nome, rótulo, unidade, tipo, padrão, mín, máx, ajuda).
 SO_APP = {
+    "q_estab": [
+        ("sc_fx_q", "Carga em faixa paralela ao muro: intensidade", "kPa", "float", 0.0, 0.0, 5000.0,
+         "0 = sem carga em faixa. Ex.: via, calçada carregada, sapata corrida de edificação vizinha. Somada à "
+         "sobrecarga uniforme q. Pressão no muro pela teoria da elasticidade (Boussinesq)"),
+        ("sc_fx_a", "Carga em faixa: distância do tardoz ao início da faixa", "m", "float", 1.0, 0.0, 100.0,
+         "Medida na superfície do terreno, a partir do tardoz da cortina"),
+        ("sc_fx_b", "Carga em faixa: largura da faixa", "m", "float", 1.0, 0.05, 100.0, ""),
+        ("sc_ln_Q", "Carga em linha paralela ao muro", "kN/m", "float", 0.0, 0.0, 1e5,
+         "0 = sem carga em linha. Ex.: muro de divisa, parede, trilho"),
+        ("sc_ln_x", "Carga em linha: distância ao tardoz", "m", "float", 1.0, 0.0, 100.0, ""),
+        ("sc_pt_P", "Carga concentrada (pontual)", "kN", "float", 0.0, 0.0, 1e6,
+         "0 = sem carga concentrada. Ex.: pilar, roda, apoio de equipamento"),
+        ("sc_pt_x", "Carga concentrada: distância ao tardoz", "m", "float", 1.0, 0.0, 100.0, ""),
+        ("sc_pt_L", "Carga concentrada: comprimento de muro que a resiste", "m", "float", 3.0, 0.5, 100.0,
+         "A pressão da carga pontual varia ao longo do muro (cos² 1,1θ); o cálculo por metro usa a média nesse "
+         "comprimento, centrado na carga. Use o trecho entre juntas ou o painel; quanto menor, mais conservador"),
+        ("sc_bq", "Cargas concentradas e em faixa: rigidez do muro", "-", "enum",
+         "Parede rígida (×2 — Terzaghi/NAVFAC)", None, None,
+         "'Parede rígida': dobro da solução elástica (muro que não se desloca; equivale a ν = 0,5) — padrão e a "
+         "favor da segurança | 'Parede que se desloca': solução elástica de Boussinesq sem dobrar"),
+    ],
     "bl_H": [
         ("bl_pos", "Posição do bloco na seção", "-", "enum", "Alinhado ao tardoz", None, None,
          "'Alinhado ao tardoz' (padrão): a face do bloco coincide com o tardoz da cortina na base (lado da "

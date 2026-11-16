@@ -23,6 +23,15 @@ PREMISSAS: dict[str, list[str]] = {
         "Kac = cos φ·cos β·cos²α / (1 + sen(φ + δ − α − β)); empuxo inclinado de α + δ com a horizontal.",
         "Corte de tração: σa < 0 é zerado. A sobrecarga q soma-se a σz' em toda a altura.",
         "Integração numérica por fatias (ponto médio): exata para diagramas lineares.",
+        "Cargas em faixa, em linha e concentrada no terrapleno (só no aplicativo): pressão horizontal pela teoria "
+        "da elasticidade (Boussinesq) na forma de Terzaghi (1954) / NAVFAC DM-7.2 — faixa σh = (2q/π)(β − sen β·"
+        "cos 2α); linha σh = (4Q/πH)·m²n/(m² + n²)²; ponto σh = 1,77(P/H²)·m²n²/(m² + n²)³·cos²(1,1θ), com m ≥ 0,4. "
+        "Padrão 'parede rígida' = dobro da solução elástica (equivale a ν = 0,5); opção sem dobrar para muro que "
+        "se desloca. Pressões horizontais, sem atrito, somadas ao empuxo de terra nas duas fases.",
+        "Nessas cargas, a estabilidade usa o plano vertical pela extremidade do talão (carga sobre o talão é "
+        "tratada como encostada no plano, e o peso dela só estabiliza se a sobrecarga sobre o talão for marcada "
+        "como estabilizante); a cortina usa as distâncias ao tardoz; o talão recebe o peso das cargas que estão "
+        "sobre ele. A carga concentrada entra pela média num comprimento de muro informado.",
         "Fase 2 (muro travado): empuxo em repouso K0 = (1 − sen φ)(1 + sen β) (Jaky; EN 1997-1 9.5.2), "
         "horizontal e sem coesão, mais a força do travamento.",
     ],
@@ -68,8 +77,9 @@ PREMISSAS: dict[str, list[str]] = {
         "armadura comprimida; cortante da ponta com γf aplicado a toda a reação do solo.",
     ],
     "Limitações": [
-        "Uma única camada de solo no aterro; sapata de espessura constante; sem dente; sem sismo; sem cargas "
-        "concentradas.",
+        "Uma única camada de solo no aterro; sapata de espessura constante; sem dente; sem sismo. Cargas "
+        "concentradas e em faixa: uma de cada tipo, só no terrapleno, sem efeito nas lajes entre contrafortes; "
+        "terreno inclinado e cunha inclinada são tratados como terreno horizontal na altura do plano de cálculo.",
         "Estabilidade global (FS ≥ 1,5 pela NBR 11682) NÃO é verificada: use um programa de estabilidade de "
         "taludes.",
         "Cunha inclinada que atinge o terreno antes do tardoz (talão longo) e cunha inclinada com Rankine: "
@@ -102,6 +112,7 @@ DIFERENCAS_DA_PLANILHA: list[str] = [
     "Excentricidade entre o limite e B/4: a planilha reprova; o aplicativo aceita se a base, verificada com a "
     "distribuição triangular de tensões (descolamento parcial), tiver armadura e cortante suficientes e a área "
     "comprimida for ≥ 2/3 (NBR 6122 7.6.2).",
+    "Cargas em faixa, em linha e concentrada no terrapleno (Boussinesq): não existem na planilha.",
     "Ancoragem na base sob a ponta: a força das estacas não é descontada do momento nem do cortante da ponta "
     "(a planilha desconta). É resistência passiva, mobilizada por inteiro só na ruptura; o GEO5 também não a "
     "desconta. Os esforços da ponta ficam maiores.",

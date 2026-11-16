@@ -5,7 +5,7 @@ Leia-o inteiro antes de mexer em qualquer coisa. O estado técnico detalhado est
 [README.md](README.md); o plano original, em [PLANEJAMENTO.md](PLANEJAMENTO.md) (histórico — não é
 mais a referência).
 
-Situação em 16/11/2026: aplicativo completo e funcionando, **184 testes passando**.
+Situação em 16/11/2026: aplicativo completo e funcionando, **190 testes passando**.
 
 ---
 
@@ -37,6 +37,7 @@ concreto armado (ABNT NBR 11682) e dimensionamento estrutural (ABNT NBR 6118), p
 | 16/11/2026 | Ancoragem (estacas) sob a ponta **não é descontada** do momento nem do cortante da ponta (a planilha desconta; o GEO5 não) |
 | 16/11/2026 | Padrões: **δb = 3/4·φ**, **adesão a = α·c** com α por tipo de solo, **solo da frente em repouso** |
 | 16/11/2026 | Excentricidade: limite continua B/6; **entre B/6 e B/4 aceita se a base resistir** à distribuição triangular (descolamento); acima de B/4 reprova |
+| 16/11/2026 | **Cargas em faixa, em linha e concentrada** (Boussinesq/Terzaghi), parede rígida ×2 por padrão; carga pontual pela média num comprimento de muro |
 
 Regra derivada: todo novo desvio em relação à planilha tem de ser (a) registrado em
 `core/premissas.py` (`DIFERENCAS_DA_PLANILHA`), (b) descrito no README e (c) coberto por teste.
@@ -73,7 +74,7 @@ core/             campos.py (GERADO) · enums.py · models.py · geometria.py ·
 ui/               estado.py · inputs.py · painel.py · graficos.py · armacao.py · estudo_solo.py · formato.py
 io_/              projeto.py (JSON) · excel.py · memorial.py (PDF) · sondagem.py (leitura do PDF de SPT)
 tools/            gerar_campos.py · gerar_cenarios.py
-tests/            9 arquivos, 184 testes; tests/data/cenarios.json é a referência do Excel
+tests/            9 arquivos, 190 testes; tests/data/cenarios.json é a referência do Excel
 ```
 
 Cadeia de cálculo (funções puras, sem iteração):
@@ -88,7 +89,7 @@ Convenções que você precisa respeitar:
 - **Nomes de campos e resultados = nomes definidos da planilha** (`H_muro`, `p_Pah`, `R_FSd`,
   `dm_Asnp`…). Não renomeie: é o que permite rastrear cada número até a célula.
 - `core/campos.py` é **gerado** por `tools/gerar_campos.py` a partir da planilha. Não edite à mão.
-  São 111 campos: 108 da planilha e 3 só do aplicativo (`bl_pos`, `bl_x`, `laje_cf`), reconhecíveis
+  São 120 campos: 108 da planilha e 12 só do aplicativo (`bl_pos`, `bl_x`, `laje_cf` e os nove `sc_*` das cargas concentradas), reconhecíveis
   por `Campo.celula == ""`.
 - `Entrada` é um modelo pydantic v2 congelado, montado com `create_model` a partir de `campos.py`.
   Para variar um dado use `entrada.com(campo=valor)`.
@@ -153,6 +154,8 @@ Lista completa e atualizada em `core/premissas.py` e no README. Resumo:
 - ancoragem sob a ponta não alivia os esforços da ponta;
 - padrões de `k_phi` (0,75), `k_c` (0,5) e `ff_tipo` (em repouso) — vêm de `PADRAO_APP` em
   `tools/gerar_campos.py`; `core.planilha.PADROES_PLANILHA` devolve os da planilha;
+- cargas em faixa/linha/ponto: `core/boussinesq.py`; entram como linhas extras **depois** das 17 forças da
+  planilha (só quando ativas) e somadas às pressões da cortina;
 - faixa de excentricidade até B/4 (`Verificacoes.exc_faixa`, checks “Base com descolamento”, valores `ex_*`);
 - laje com borda livre no muro com contrafortes;
 - bloco de coroamento alinhado ao tardoz;
@@ -210,7 +213,7 @@ Proponha antes de fazer; a decisão é do projetista.
 5. O envio do PDF de sondagem pelo navegador não foi testado de ponta a ponta. O leitor foi
    conferido com boletins de duas empresas de sondagem, direto pelos arquivos.
 6. Limitações do modelo: uma camada de solo no aterro (o perfil da sondagem é homogeneizado),
-   sapata de espessura constante, sem dente, sismo ou cargas concentradas; **estabilidade global não
+   sapata de espessura constante, sem dente nem sismo; cargas concentradas sem efeito nas lajes entre contrafortes; **estabilidade global não
    é verificada**; sem fissuração, ancoragem e emendas, nem estribos do contraforte.
 7. `Parametros_do_solo_Recomendado.xlsx` alimenta `core/solos.py`; se mudar, atualizar as tabelas.
 
@@ -220,7 +223,7 @@ Proponha antes de fazer; a decisão é do projetista.
    ou **entrada/saída** (`io_/`).
 2. Se envolver a planilha, releia as células envolvidas com `openpyxl` (fórmulas e valores) antes
    de escrever código.
-3. Rode `pytest` antes de começar, para confirmar os 184 testes verdes.
+3. Rode `pytest` antes de começar, para confirmar os 190 testes verdes.
 4. Faça a mudança no núcleo primeiro, com teste; só depois a interface.
 5. Se o resultado passar a diferir da planilha, pare e classifique: erro de porte (corrija) ou
    desvio deliberado (registre em `premissas.py`, no README e como exceção nomeada na paridade).

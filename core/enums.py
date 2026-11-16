@@ -114,6 +114,11 @@ class PressaoLaje(_Opcao):
     TOPO = "Até o topo da base"
 
 
+class ParedeBoussinesq(_Opcao):  # só no aplicativo
+    RIGIDA = "Parede rígida (×2 — Terzaghi/NAVFAC)"
+    FLEXIVEL = "Parede que se desloca (×1 — Boussinesq)"
+
+
 class PosicaoBloco(_Opcao):      # só no aplicativo (não existe na planilha)
     TARDOZ = "Alinhado ao tardoz"
     ESTACAS = "Centrado nas estacas (planilha)"
@@ -163,6 +168,7 @@ ENUM_DO_CAMPO: dict[str, type[_Opcao]] = {
     "xd_lim": LimiteXd,
     "laje_pres": PressaoLaje,
     "bl_pos": PosicaoBloco,
+    "sc_bq": ParedeBoussinesq,
     "laje_cf": ModeloLajeCF,
 }
 
