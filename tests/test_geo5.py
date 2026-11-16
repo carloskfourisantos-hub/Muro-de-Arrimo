@@ -233,7 +233,7 @@ def test_contrafortes_dimensionamento(geo5_cf):
 # ---------------------------------------------------------------------------------------------------
 # Quarto caso de referência: memorial do GEO5 de 16/11/2026, muro com talão e cunha de terra inclinada.
 # Cortina 0,30 × 3,00 m, sapata 1,90 × 0,30 m (ponta 0,80 m, talão 0,80 m), estacas de 0,40 m × 8 m a cada
-# 3 m em x = 0,95 m, C20, ϕ16 c/ 15, Rd = 150 kPa. Geometria deduzida dos pesos do memorial.
+# 3 m em x = 0,95 m, C20, ϕ16 c/ 15, Rd = 150 kPa. Geometria confirmada pela tabela do memorial.
 MURO_TALAO = dict(H_muro=3.30, h_sap=0.30, t_topo=0.3, t_base=0.3, b_ponta=0.8, b_talao=0.8, D_frente=0.6,
                   solo_ponta=True, q_sc=10, gam_at=20, gsat_at=20, phi_at=30, c_at=5, delta_est=10, gam_f=20,
                   gsat_f=20, phi_f=30, c_f=5, fck_c=20, ar_tz_phi=16, ar_tz_s=15.0, ar_bi_phi=16, ar_bi_s=15.0,
@@ -282,6 +282,29 @@ def test_talao_cunha_inclinada_dimensionamento(geo5_talao):
     assert d["dm_MRdp"] == pytest.approx(139.60, rel=0.007) and d["dm_MRdp"] < 139.60   # haste: GEO5 soma N
     # cortante do avanço: a combinação de ações favoráveis reproduz o GEO5; o aplicativo adota a envoltória
     assert d["dm_VSd_pt_fav"] == pytest.approx(59.05, rel=0.035) and d["dm_VSd_pt"] >= 59.05
-    # diferença NÃO explicada: momento do avanço 67,68 kN·m/m no GEO5 × 30,9 pelas pressões na base.
-    # Com 'Igual à cortina (GEO5)' o aplicativo usa o momento da haste (94,5), acima do GEO5.
+    # Momento do avanço: o GEO5 usa o equilíbrio do nó, haste − dente = 94,35 − 26,68 = 67,68 kN·m/m
+    # (confirmado com a página do dente). O aplicativo, pelas pressões na base, dá 30,9; ajuste pendente de
+    # decisão do projetista. Com 'Igual à cortina (GEO5)' o aplicativo usa o momento da haste (94,5).
+    assert 94.35 - 26.68 == pytest.approx(67.68, abs=0.015)
     assert d["dm_MSd_pt"] == pytest.approx(30.86, abs=0.05)
+
+
+def test_talao_cunha_inclinada_c25_e_dente():
+    """Segunda rodada do mesmo muro no GEO5, com C25 e ϕ10 c/ 15 na face superior do talão (dente)."""
+    r = calcular(Entrada(**{**MURO_TALAO, "fck_c": 25, "ar_bs_phi": 10}, **CRITERIOS_TALAO))
+    d, F, v, B = r.dim.v, r.fase1.forcas, r.fase1.verif, r.geo.B_base
+    assert d["dm_MSdp"] == pytest.approx(94.35, rel=0.002)
+    assert d["dm_Asnp"] * 100 == pytest.approx(869.6, rel=0.003)
+    assert d["dm_MRdp"] == pytest.approx(141.28, rel=0.002)
+    assert d["dm_MRd_pt"] == pytest.approx(141.57, rel=0.001)
+    assert d["dm_VRd"] == pytest.approx(201.22, rel=0.002)
+    assert d["dm_Abs"] * 100 == pytest.approx(523.9, rel=0.001)
+    assert d["dm_MRd_tl"] == pytest.approx(58.65, rel=0.001)
+    # dente no GEO5: empuxo × 1,4, pesos × 1,0 e reação do solo de SERVIÇO × 1,0 → VEd = 21,26 kN/m
+    sig = lambda x: F.F_N / B + 12 * F.F_N * v.R_e * (B / 2 - x) / B**3   # noqa: E731
+    reacao = (sig(1.1) + sig(1.9)) / 2 * 0.8
+    assert reacao == pytest.approx(54.33, abs=0.01)
+    solo = next(f.Fz for f in F.linhas if f.nome.startswith("Solo sobre o talão (γ"))
+    assert 0.8 * 0.3 * 25 + solo + 1.4 * r.fase1.emp.p_Pav - reacao == pytest.approx(21.26, abs=0.01)
+    # o aplicativo dá menos no talão (16,6 kN/m e 11,5 kN·m/m contra 21,26 e 26,68): diferença em aberto
+    assert d["dm_VSd_tl"] < 21.26 and d["dm_MSd_tl"] < 26.68
