@@ -351,7 +351,7 @@ def test_cargas_concentradas_na_interface_e_no_memorial():
 def test_base_usa_a_envoltoria_das_duas_combinacoes():
     r = calcular(Entrada(b_talao=0.0, b_ponta=2.2, ponta_mod="Pressões na base"))
     d, gf = r.dim.v, r.entrada.gf_f
-    assert d["dm_fav_gov"] and any("combinações de ações" in n for n in r.dim.notas)
+    assert d["dm_fav_gov"] and any("Combinações de ações na base" in n for n in r.dim.notas)
     assert d["dm_MSd_pt_fav"] > gf * d["dm_MtP1"]                    # só o empuxo majorado supera γf × serviço
     assert d["dm_MSd_pt"] == pytest.approx(d["dm_MSd_pt_comb"]) and d["dm_MSd_pt"] >= d["dm_MSd_pt_fav"]
     assert d["dm_VSd_pt"] == pytest.approx(max(gf * d["dm_VtP"], d["dm_VSd_pt_comb"]))
@@ -367,12 +367,13 @@ def test_base_usa_a_envoltoria_das_duas_combinacoes():
 
 
 def test_base_pior_caso_de_todas_as_combinacoes():
-    """Cada grupo de ações com 1,0 ou γf; reação de serviço com 1,0 ou γf; vale o pior caso."""
-    r = calcular(Entrada())
+    """Opção 'todas as locais': reação de serviço, pesos e empuxo vertical com 1,0 ou γf; vale o pior caso."""
+    r = calcular(Entrada(comb_base="Equilíbrio + todas as locais (mais severo)"))
     d, e, g = r.dim.v, r.entrada, r.geo
     gf = e.gf_f
     assert d["dm_n_comb"] == 12                                      # 4 em equilíbrio (sem água) + 8 locais
-    assert calcular(Entrada(hw_at=1.5)).dim.v["dm_n_comb"] == 16     # com água: 8 + 8
+    assert calcular(Entrada(hw_at=1.5, comb_base="Equilíbrio + todas as locais (mais severo)")).dim.v["dm_n_comb"] == 16     # com água: 8 + 8
+    assert not r.dim.atende                                          # o talão do exemplo não passa nesse critério
     # talão: pior caso = pesos e empuxo vertical com γf contra a reação de serviço com 1,0
     b = r.dim.base
     tal = b["zona"] == "Talão"
@@ -391,6 +392,29 @@ def test_base_pior_caso_de_todas_as_combinacoes():
     # nunca abaixo de γf × serviço
     assert d["dm_MSd_tl"] >= gf * d["dm_Mtt"] and d["dm_VSd_tl"] >= gf * d["dm_VtT"]
     assert d["dm_MSd_pt"] >= gf * d["dm_MtP1"] and d["dm_VSd_pt"] >= gf * d["dm_VtP"]
+
+
+def test_combinacoes_da_base_padrao_geo5():
+    """Padrão: combinações em equilíbrio + local do GEO5 (empuxo vertical × γf; pesos e reação × 1,0)."""
+    r = calcular(Entrada())
+    d, e, g, b = r.dim.v, r.entrada, r.geo, r.dim.base
+    gf = e.gf_f
+    assert e.comb_base == "Equilíbrio + local do GEO5" and d["dm_n_comb"] == 5 and r.dim.atende
+    tal = b["zona"] == "Talão"
+    dx = g.B_base / len(b["x"])
+    braco = b["x"] - g.x_tb
+    emp = r.fase1.emp
+    liquido = ((b["peso"] + b["carga_talao"] - b["sig1"] - b["u"]) * braco)[tal].sum() * dx
+    assert d["dm_MSd_tl_geo"] == pytest.approx(liquido + gf * emp.p_Pav * (emp.p_xPav - g.x_tb), rel=1e-9)
+    assert d["dm_MSd_tl"] == pytest.approx(max(d["dm_MSd_tl_eq"], d["dm_MSd_tl_geo"]))
+    assert d["dm_MSd_tl_eq"] < d["dm_MSd_tl_geo"] < d["dm_MSd_tl_loc"]      # 92,8 < 105,6 < 132,1
+    # a nota mostra os três conjuntos e diz qual foi adotado
+    nota = next(n for n in r.dim.notas if n.startswith("Combinações de ações na base"))
+    assert "(a) em equilíbrio" in nota and "(b) local, critério do GEO5" in nota and "(c) locais, todas" in nota
+    assert "Adotado: pior caso entre (a) e (b)" in nota
+    sev = calcular(Entrada(comb_base="Equilíbrio + todas as locais (mais severo)"))
+    assert "Adotado: pior caso entre (a) e (c)" in next(n for n in sev.dim.notas if n.startswith("Combinações"))
+    assert sev.dim.v["dm_MSd_tl"] == pytest.approx(d["dm_MSd_tl_loc"])
 
 
 def test_equilibrio_do_no_cortina_sapata():

@@ -27,8 +27,7 @@ def test_verificacao_padrao():
     texto = " ".join(m.value for m in at.markdown)
     assert "4,04" in texto and "1,53" in texto and "6,91" in texto      # FSt, FSd, FScc do exemplo
     assert "Estabilidade externa (NBR 11682): ATENDE" in texto
-    # com o pior caso de todas as combinações o talão do exemplo pede 8,65 cm²/m e tem 8,18
-    assert "Dimensionamento estrutural (NBR 6118): NÃO ATENDE" in texto
+    assert "Dimensionamento estrutural (NBR 6118): ATENDE" in texto
 
 
 @pytest.mark.parametrize("secao", ["Forças", "Empuxo", "Geometria", "Capacidade de carga", "Ferramentas",
@@ -81,7 +80,7 @@ def test_opcoes_ativas_e_legadas():
 def test_pagina_de_dimensionamento():
     at = _pagina("dimensionamento")
     texto = " ".join(m.value for m in at.markdown)
-    assert "Dimensionamento estrutural (NBR 6118): NÃO ATENDE" in texto
+    assert "Dimensionamento estrutural (NBR 6118): ATENDE" in texto
     chaves = {w.key for w in at.number_input}
     assert "w_cob_ct" in chaves and "w_H_muro" not in chaves            # geometria fica na verificação
     at.selectbox(key="w_ar_tz_phi").set_value(8.0)

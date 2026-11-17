@@ -238,6 +238,8 @@ CAMPOS: tuple[Campo, ...] = (
           'GEO5: 0 (desprezado)'),
     Campo('xd_lim', '10. DIMENSIONAMENTO ESTRUTURAL (ABNT NBR 6118) — aba Dimensionamento', 'Limite de x/d (ductilidade) verificado com a armadura efetiva', '-', 'enum', '0,45 (NBR 6118)', None, None, None, 'Entrada!C113',
           "'0,45 (NBR 6118)' (NBR 14.6.4.3) | '0,259 (GEO5)': limite do domínio 2 usado pelo GEO5 ('seção muito armada')"),
+    Campo('comb_base', '10. DIMENSIONAMENTO ESTRUTURAL (ABNT NBR 6118) — aba Dimensionamento', 'Combinações de ações na base (ponta e talão)', '-', 'enum', 'Equilíbrio + local do GEO5', None, None, None, '',
+          "'Equilíbrio + local do GEO5' (padrão): pior caso entre as combinações em equilíbrio (cada grupo de ações em 1,0 ou γf, com a reação do solo de cada uma) e a combinação local do GEO5 (empuxo vertical × γf, pesos e reação do solo de serviço × 1,0) | 'Equilíbrio + todas as locais': acrescenta as 8 combinações locais com reação, pesos e empuxo vertical em 1,0 ou γf — não equilibradas e bem mais severas no talão"),
     Campo('gf_cs', '10b. MURO COM CONTRAFORTES — cortina e base como lajes, contraforte como viga (aba Dimensionamento)', 'γf da cortina como laje entre contrafortes', '-', 'float', None, 1, 2, 'gf_f', 'Entrada!C115',
           'GEO5 usa as pressões características (1,0) na cortina e 1,4 na base e no contraforte'),
     Campo('laje_pres', '10b. MURO COM CONTRAFORTES — cortina e base como lajes, contraforte como viga (aba Dimensionamento)', 'Pressões da cortina entre contrafortes', '-', 'enum', 'Até o fundo da base (GEO5)', None, None, None, 'Entrada!C116',

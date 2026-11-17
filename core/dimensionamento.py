@@ -17,7 +17,7 @@ import numpy as np
 from . import placa
 from .concreto import Concreto, area_barras, criar_concreto
 from .empuxo import SEM_NA, k_mazindrani
-from .enums import (LimiteXd, MetodoEmpuxo, ModeloCortante, ModeloLajeCF, MomentoPonta, PesoNA, PosicaoContraforte,
+from .enums import (CombinacoesBase, LimiteXd, MetodoEmpuxo, ModeloCortante, ModeloLajeCF, MomentoPonta, PesoNA, PosicaoContraforte,
                     PressaoLaje, ResFrontal, Subpressao, TensaoDim, TipoEmpuxo)
 from .forcas import PREFIXOS_EMPUXO
 from .geometria import TOL, Geometria
@@ -267,42 +267,47 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
         return _sigma_base(xb, N, ex, Bef, N / Bef, B, ret and not linear) + us - k[1] * (w_sap + carga_tal)
 
     fav_fora = False
-    MB_pt = VB_pt = MB_tl = VB_tl = 0.0          # envoltória: ponta (tração embaixo) e talão (tração em cima)
-    MN_pt = MN_tl = 0.0                          # sentido contrário: ponta em cima, talão embaixo
-    fav = dict(M_pt=0.0, V_pt=0.0, M_tl=0.0, V_tl=0.0)
+    _zero = lambda: dict(M_pt=0.0, V_pt=0.0, M_tl=0.0, V_tl=0.0, N_pt=0.0, N_tl=0.0)   # noqa: E731
+    # M_* = sentido usual (ponta tracionada embaixo, talão em cima); N_* = sentido contrário
+    E_eq, E_geo, E_loc, fav = _zero(), _zero(), _zero(), _zero()
 
-    def _acumula(q, emp, kpav, eh_fav=False):
-        nonlocal MB_pt, VB_pt, MB_tl, VB_tl, MN_pt, MN_tl
+    def _acumula(env, q, emp, kpav):
         if tem_ponta:
             m, s = ponta(q)
-            MB_pt, VB_pt, MN_pt = max(MB_pt, m), max(VB_pt, abs(s)), max(MN_pt, -m)
-            if eh_fav:
-                fav.update(M_pt=max(fav["M_pt"], m), V_pt=max(fav["V_pt"], abs(s)))
+            env.update(M_pt=max(env["M_pt"], m), V_pt=max(env["V_pt"], abs(s)), N_pt=max(env["N_pt"], -m))
         if tem_talao:
             m, s = talao(q, emp, kpav)
-            MB_tl, VB_tl, MN_tl = max(MB_tl, m), max(VB_tl, abs(s)), max(MN_tl, -m)
-            if eh_fav:
-                fav.update(M_tl=max(fav["M_tl"], m), V_tl=max(fav["V_tl"], abs(s)))
+            env.update(M_tl=max(env["M_tl"], m), V_tl=max(env["V_tl"], abs(s)), N_tl=max(env["N_tl"], -m))
 
     for f, sig_s in zip(fases_dim, (sig1, sig2)):
-        for k in COMBOS:                                     # equilíbrio de cada combinação
+        for k in COMBOS:                                     # combinações em equilíbrio
             qk = q_comb(f, k)
             if qk is None:
                 fav_fora = fav_fora or f.forcas.F_N > 0
                 continue
-            _acumula(qk, f.emp, k[0], k == K_FAV)
-        v.update(dm_MSd_pt_eq=max(v.get('dm_MSd_pt_eq', 0.0), MB_pt), dm_MSd_tl_eq=max(v.get('dm_MSd_tl_eq', 0.0), MB_tl),
-                 dm_VSd_pt_eq=max(v.get('dm_VSd_pt_eq', 0.0), VB_pt), dm_VSd_tl_eq=max(v.get('dm_VSd_tl_eq', 0.0), VB_tl))
-        if f.forcas.F_N > 0 and abs(f.verif.R_e) < B / 2:    # reação de serviço × pesos × empuxo vertical
-            for kR in (1.0, gf):
+            _acumula(E_eq, qk, f.emp, k[0])
+            if k == K_FAV:
+                _acumula(fav, qk, f.emp, k[0])
+        if f.forcas.F_N > 0 and abs(f.verif.R_e) < B / 2:    # combinações locais: reação de serviço
+            # critério do GEO5: empuxo vertical × γf, pesos × 1,0, reação do solo de serviço × 1,0
+            _acumula(E_geo, (sig_s + usub) - (w_sap + carga_tal), f.emp, gf)
+            for kR in (1.0, gf):                             # todas: reação × pesos × empuxo vertical
                 for kW in (1.0, gf):
                     for kV in (1.0, gf):
-                        _acumula(kR * (sig_s + usub) - kW * (w_sap + carga_tal), f.emp, kV)
+                        _acumula(E_loc, kR * (sig_s + usub) - kW * (w_sap + carga_tal), f.emp, kV)
+    todas_locais = e.comb_base == CombinacoesBase.TODAS
+    E_ad = E_loc if todas_locais else E_geo
+    MB_pt, VB_pt = max(E_eq["M_pt"], E_ad["M_pt"]), max(E_eq["V_pt"], E_ad["V_pt"])
+    MB_tl, VB_tl = max(E_eq["M_tl"], E_ad["M_tl"]), max(E_eq["V_tl"], E_ad["V_tl"])
+    MN_pt, MN_tl = max(E_eq["N_pt"], E_ad["N_pt"]), max(E_eq["N_tl"], E_ad["N_tl"])
     Nf1, ef1 = comb(f1, K_FAV)
     v.update(dm_N_fav=Nf1, dm_e_fav=ef1, dm_MSd_pt_fav=fav["M_pt"], dm_VSd_pt_fav=fav["V_pt"],
              dm_MSd_tl_fav=fav["M_tl"], dm_VSd_tl_fav=fav["V_tl"], dm_MSd_pt_comb=MB_pt, dm_VSd_pt_comb=VB_pt,
              dm_MSd_tl_comb=MB_tl, dm_VSd_tl_comb=VB_tl, dm_MSd_pt_sup=MN_pt, dm_MSd_tl_inf=MN_tl,
-             dm_n_comb=len(COMBOS) + 8)
+             dm_n_comb=len(COMBOS) + (8 if todas_locais else 1))
+    for suf, env in (("eq", E_eq), ("geo", E_geo), ("loc", E_loc)):
+        v.update({f"dm_MSd_pt_{suf}": env["M_pt"], f"dm_VSd_pt_{suf}": env["V_pt"],
+                  f"dm_MSd_tl_{suf}": env["M_tl"], f"dm_VSd_tl_{suf}": env["V_tl"]})
 
     MtP1, VtP1 = ponta(q1)
     MtP2, VtP2 = ponta(q2) if trav else (0.0, 0.0)
@@ -609,10 +614,29 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
             f"{fm(max(As_t, 0))} cm²/m — {txt_falta(v['ex_dAs_tl'], ft)}. O trecho descolado do talão trabalha "
             "sem reação do solo, carregado pelo peso do aterro e pelo peso próprio. Acima de B/4 o muro é "
             "reprovado; prefira aumentar a base quando o descolamento ocorrer sob cargas permanentes.")
+    if (tem_ponta and pt_on) or (tem_talao and tl_on):
+        fm1 = lambda x: f"{x:.1f}".replace(".", ",")   # noqa: E731
+        def _linha(rot, env):
+            partes = []
+            if tem_ponta and pt_on:
+                partes.append(f"ponta M = {fm1(env['M_pt'])} kN·m/m e V = {fm1(env['V_pt'])} kN/m")
+            if tem_talao and tl_on:
+                partes.append(f"talão M = {fm1(env['M_tl'])} kN·m/m e V = {fm1(env['V_tl'])} kN/m")
+            return f"{rot}: " + "; ".join(partes)
+        notas.append(
+            "Combinações de ações na base (esforços de cálculo). "
+            + _linha(f"(a) em equilíbrio — {len(COMBOS)} combinações com cada grupo (empuxo; pesos, ancoragem e "
+                     "resistências; água) em 1,0 ou γf e a reação do solo do equilíbrio de cada uma", E_eq) + ". "
+            + _linha("(b) local, critério do GEO5 — empuxo vertical × γf, pesos × 1,0 e reação do solo de "
+                     "serviço × 1,0", E_geo) + ". "
+            + _linha("(c) locais, todas — reação de serviço, pesos e empuxo vertical em 1,0 ou γf (8 combinações, "
+                     "não equilibradas)", E_loc) + ". "
+            + ("Adotado: pior caso entre (a) e (c)." if todas_locais else
+               "Adotado: pior caso entre (a) e (b), que é o padrão; (c) é só informativo e pode ser adotado na "
+               "opção 'Combinações de ações na base'."))
     if fav_gov:
-        notas.append(f"Base dimensionada pelo pior caso de {len(COMBOS) + 8} combinações de ações, cada grupo "
-                     "(empuxo; pesos, ancoragem e resistências; água; reação do solo) com 1,0 ou γf (NBR 8681). "
-                     "Os esforços superam γf × os de serviço, que é o critério da planilha.")
+        notas.append("Base dimensionada por uma combinação de ações mais desfavorável que γf × esforços de serviço "
+                     "(critério da planilha) — ver a nota das combinações.")
     if no_gov:
         notas.append("Momento da ponta definido pelo equilíbrio do nó cortina-sapata: momento de cálculo da base da "
                      "cortina menos o momento para o qual o talão é armado ("

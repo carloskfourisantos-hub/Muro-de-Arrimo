@@ -125,6 +125,11 @@ class PosicaoBloco(_Opcao):      # só no aplicativo (não existe na planilha)
     INFORMADA = "Posição informada"
 
 
+class CombinacoesBase(_Opcao):   # só no aplicativo
+    GEO5 = "Equilíbrio + local do GEO5"
+    TODAS = "Equilíbrio + todas as locais (mais severo)"
+
+
 class ModeloLajeCF(_Opcao):      # só no aplicativo
     PLACA = "Laje com borda livre (placa)"
     GEO5 = "Coeficientes do GEO5 (planilha)"
@@ -170,6 +175,7 @@ ENUM_DO_CAMPO: dict[str, type[_Opcao]] = {
     "bl_pos": PosicaoBloco,
     "sc_bq": ParedeBoussinesq,
     "laje_cf": ModeloLajeCF,
+    "comb_base": CombinacoesBase,
 }
 
 # Campos Sim/Não (bool no modelo). Valor = (texto para True, texto para False)

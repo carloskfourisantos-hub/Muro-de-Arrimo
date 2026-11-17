@@ -74,6 +74,14 @@ SO_APP = {
         ("bl_x", "Início do bloco (x a partir da ponta)", "m", "float", 0.35, -5.0, 40.0,
          "Só usado com 'Posição informada': x da face do bloco voltada para a ponta"),
     ],
+    "xd_lim": [
+        ("comb_base", "Combinações de ações na base (ponta e talão)", "-", "enum", "Equilíbrio + local do GEO5",
+         None, None,
+         "'Equilíbrio + local do GEO5' (padrão): pior caso entre as combinações em equilíbrio (cada grupo de ações "
+         "em 1,0 ou γf, com a reação do solo de cada uma) e a combinação local do GEO5 (empuxo vertical × γf, "
+         "pesos e reação do solo de serviço × 1,0) | 'Equilíbrio + todas as locais': acrescenta as 8 combinações "
+         "locais com reação, pesos e empuxo vertical em 1,0 ou γf — não equilibradas e bem mais severas no talão"),
+    ],
     "cf_phi": [
         ("laje_cf", "Modelo da cortina e da base entre contrafortes", "-", "enum", "Laje com borda livre (placa)",
          None, None,

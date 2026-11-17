@@ -143,9 +143,9 @@ def test_ancoragem_dimensionamento(geo5_anc):
     # diferenças conhecidas:
     assert d["dm_MRdp"] == pytest.approx(64.36, rel=0.006)        # haste com x/d = 0,28 > 0,259: GEO5 0,5 % menor
     # cortante do avanço: nenhum dos dois desconta a ancoragem. GEO5 = 46,01 (γf só no empuxo, excentricidade
-    # recalculada); o aplicativo adota o pior caso das combinações (reação × γf contra o peso × 1,0).
+    # recalculada); o aplicativo adota o pior caso das combinações (aqui γf × serviço).
     assert d["dm_VSd_pt_fav"] == pytest.approx(46.01, rel=0.02)
-    assert d["dm_VSd_pt"] == pytest.approx(71.95, abs=0.05) and d["dm_VSd_pt"] > 46.01
+    assert d["dm_VSd_pt"] == pytest.approx(70.75, abs=0.05) and d["dm_VSd_pt"] > 46.01
 
 
 def test_ancoragem_nao_alivia_a_ponta():
@@ -287,9 +287,9 @@ def test_talao_cunha_inclinada_dimensionamento(geo5_talao):
     # (confirmado com a página do dente). Pelas pressões na base o aplicativo dá 31,8; no modo 'Máximo'
     # aplica o equilíbrio do nó com o talão dele (ver tests/test_nucleo.py) e fica acima do GEO5.
     assert 94.35 - 26.68 == pytest.approx(67.68, abs=0.015)
-    assert d["dm_MSd_pt"] == pytest.approx(31.82, abs=0.05)
+    assert d["dm_MSd_pt"] == pytest.approx(30.86, abs=0.05)
     maximo = calcular(Entrada(**MURO_TALAO, **{**CRITERIOS_TALAO, "ponta_mod": "Máximo"})).dim.v
-    assert maximo["dm_MSd_pt"] == pytest.approx(78.56, abs=0.1) and maximo["dm_MSd_pt"] > 67.68
+    assert maximo["dm_MSd_pt"] == pytest.approx(81.29, abs=0.1) and maximo["dm_MSd_pt"] > 67.68
 
 
 def test_talao_cunha_inclinada_c25_e_dente():
@@ -313,5 +313,5 @@ def test_talao_cunha_inclinada_c25_e_dente():
     # momento do empuxo horizontal no conjunto talão + cunha, que tem sentido contrário ao das cargas verticais
     # e na prática é levado pela haste; o aplicativo arma o talão para as cargas verticais (15,9) e garante o
     # equilíbrio do nó pela ponta.
-    assert d["dm_VSd_tl"] == pytest.approx(28.22, abs=0.05) and d["dm_VSd_tl"] > 21.26
-    assert d["dm_MSd_tl"] == pytest.approx(15.90, abs=0.05)
+    assert d["dm_VSd_tl"] == pytest.approx(21.26, rel=0.004)          # critério local do GEO5: reproduz
+    assert d["dm_MSd_tl"] == pytest.approx(13.17, abs=0.05)

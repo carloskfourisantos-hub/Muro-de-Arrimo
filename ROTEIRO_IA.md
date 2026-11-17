@@ -5,7 +5,7 @@ Leia-o inteiro antes de mexer em qualquer coisa. O estado técnico detalhado est
 [README.md](README.md); o plano original, em [PLANEJAMENTO.md](PLANEJAMENTO.md) (histórico — não é
 mais a referência).
 
-Situação em 16/11/2026: aplicativo completo e funcionando, **199 testes passando**.
+Situação em 16/11/2026: aplicativo completo e funcionando, **200 testes passando**.
 
 ---
 
@@ -41,6 +41,7 @@ concreto armado (ABNT NBR 11682) e dimensionamento estrutural (ABNT NBR 6118), p
 | 16/11/2026 | Base dimensionada pela **envoltória** de γf × serviço com a combinação de **ações favoráveis em 1,0** (critério do GEO5) |
 | 16/11/2026 | Base pelo **pior caso de todas as combinações de 1,0 e γf** por grupo de ações, incluindo reação de serviço sem majorar (pedido expresso; governa o talão) |
 | 16/11/2026 | **Equilíbrio do nó**: no modo "Máximo" a ponta recebe no mínimo o momento da cortina menos o do talão |
+| 17/11/2026 | Combinações locais: **padrão = critério do GEO5** (empuxo vertical × γf; pesos e reação × 1,0); "todas as locais" virou opção (`comb_base`); nota sempre mostra equilíbrio, GEO5 e todas |
 
 Regra derivada: todo novo desvio em relação à planilha tem de ser (a) registrado em
 `core/premissas.py` (`DIFERENCAS_DA_PLANILHA`), (b) descrito no README e (c) coberto por teste.
@@ -77,7 +78,7 @@ core/             campos.py (GERADO) · enums.py · models.py · geometria.py ·
 ui/               estado.py · inputs.py · painel.py · graficos.py · armacao.py · estudo_solo.py · formato.py
 io_/              projeto.py (JSON) · excel.py · memorial.py (PDF) · sondagem.py (leitura do PDF de SPT)
 tools/            gerar_campos.py · gerar_cenarios.py
-tests/            9 arquivos, 199 testes; tests/data/cenarios.json é a referência do Excel
+tests/            9 arquivos, 200 testes; tests/data/cenarios.json é a referência do Excel
 ```
 
 Cadeia de cálculo (funções puras, sem iteração):
@@ -92,7 +93,7 @@ Convenções que você precisa respeitar:
 - **Nomes de campos e resultados = nomes definidos da planilha** (`H_muro`, `p_Pah`, `R_FSd`,
   `dm_Asnp`…). Não renomeie: é o que permite rastrear cada número até a célula.
 - `core/campos.py` é **gerado** por `tools/gerar_campos.py` a partir da planilha. Não edite à mão.
-  São 120 campos: 108 da planilha e 12 só do aplicativo (`bl_pos`, `bl_x`, `laje_cf` e os nove `sc_*` das cargas concentradas), reconhecíveis
+  São 121 campos: 108 da planilha e 13 só do aplicativo (`bl_pos`, `bl_x`, `laje_cf`, `comb_base` e os nove `sc_*` das cargas concentradas), reconhecíveis
   por `Campo.celula == ""`.
 - `Entrada` é um modelo pydantic v2 congelado, montado com `create_model` a partir de `campos.py`.
   Para variar um dado use `entrada.com(campo=valor)`.
@@ -213,8 +214,9 @@ usa empuxo × 1,4, pesos × 1,0 e a reação do solo de serviço × 1,0, e soma 
 horizontal; o cortante foi reproduzido, o momento só com a seção 0,10 m dentro da haste (regra não
 identificada). **Ajustado em 16/11/2026**: equilíbrio do nó na ponta (78,6 neste muro, contra 67,68) e
 talão pelo pior caso das combinações (15,9 kN·m/m e 28,2 kN/m). O momento do empuxo horizontal do "dente"
-do GEO5 NÃO foi copiado: tem sentido contrário ao das cargas verticais e é levado pela haste. Consequência
-das combinações: o exemplo padrão passou a reprovar no talão (8,65 × 8,18 cm²/m).
+do GEO5 NÃO foi copiado: tem sentido contrário ao das cargas verticais e é levado pela haste. Em 17/11/2026 o padrão das
+combinações locais passou a ser o do GEO5, que reproduz o cortante do dente (21,3 × 21,26 kN/m); com
+"todas as locais" o exemplo padrão reprova no talão (8,65 × 8,18 cm²/m).
 
 Diferenças que permanecem, com o aplicativo a favor da segurança salvo indicação:
 
@@ -247,7 +249,7 @@ Proponha antes de fazer; a decisão é do projetista.
    ou **entrada/saída** (`io_/`).
 2. Se envolver a planilha, releia as células envolvidas com `openpyxl` (fórmulas e valores) antes
    de escrever código.
-3. Rode `pytest` antes de começar, para confirmar os 199 testes verdes.
+3. Rode `pytest` antes de começar, para confirmar os 200 testes verdes.
 4. Faça a mudança no núcleo primeiro, com teste; só depois a interface.
 5. Se o resultado passar a diferir da planilha, pare e classifique: erro de porte (corrija) ou
    desvio deliberado (registre em `premissas.py`, no README e como exceção nomeada na paridade).

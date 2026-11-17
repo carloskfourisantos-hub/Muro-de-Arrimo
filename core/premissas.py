@@ -73,13 +73,14 @@ PREMISSAS: dict[str, list[str]] = {
         "livre (placa por elementos finitos, momentos nas duas direções) e contraforte como viga em balanço. "
         "Opção legada: coeficientes do GEO5 (M vertical = 0,03·σH·H1·l; M horizontal = σp·l²/12 nos apoios e "
         "σp·l²/20 no vão; V = σp·l/2).",
-        "Base (ponta, talão e laje entre contrafortes na frente): pior caso de todas as combinações em que cada "
-        "grupo de ações — empuxo; pesos, ancoragem e resistências; água — entra com 1,0 ou com γf (NBR 8681), "
-        "com a reação do solo obtida do equilíbrio de cada combinação. Somam-se as combinações locais com a "
-        "reação do solo de serviço × 1,0 ou γf contra os pesos e o empuxo vertical × 1,0 ou γf. 'γf × esforços de "
-        "serviço' (planilha) é uma delas. Se em alguma a resultante de cálculo sair da base, reprova.",
-        "As combinações locais não são equilibradas (ex.: pesos × γf contra reação × 1,0) e costumam governar o "
-        "talão; são o critério mais severo, pedido pelo projetista em 16/11/2026.",
+        "Base (ponta, talão e laje entre contrafortes na frente): pior caso entre (a) as combinações em "
+        "equilíbrio — cada grupo de ações (empuxo; pesos, ancoragem e resistências; água) em 1,0 ou γf (NBR 8681), "
+        "com a reação do solo do equilíbrio de cada uma — e (b) a combinação local do GEO5: empuxo vertical × γf, "
+        "pesos × 1,0 e reação do solo de serviço × 1,0. 'γf × esforços de serviço' (planilha) é uma das (a). Se em "
+        "alguma a resultante de cálculo sair da base, reprova.",
+        "Opção 'Equilíbrio + todas as locais': troca (b) pelas 8 combinações locais com reação de serviço, pesos e "
+        "empuxo vertical em 1,0 ou γf. Não são equilibradas (ex.: pesos × γf contra reação × 1,0) e ficam bem mais "
+        "severas no talão. O dimensionamento sempre traz uma nota com os esforços de (a), (b) e (c).",
         "Equilíbrio do nó cortina-sapata (modo 'Máximo' do momento na ponta): a ponta é armada para, no mínimo, o "
         "momento de cálculo da base da cortina menos o momento para o qual o talão é armado. Sem talão, recebe o "
         "momento inteiro da cortina. Não se aplica à base entre contrafortes.",
@@ -126,8 +127,8 @@ DIFERENCAS_DA_PLANILHA: list[str] = [
     "comprimida for ≥ 2/3 (NBR 6122 7.6.2).",
     "Cargas em faixa, em linha e concentrada no terrapleno (Boussinesq): não existem na planilha.",
     "Dimensionamento da base: a planilha usa só γf × esforços de serviço; o aplicativo adota o pior caso de "
-    "todas as combinações de 1,0 e γf por grupo de ações (NBR 8681), incluindo a reação do solo de serviço sem "
-    "majorar. Os esforços nunca ficam abaixo dos da planilha e o talão costuma ficar bem acima.",
+    "combinações de 1,0 e γf por grupo de ações (NBR 8681) e da combinação local do GEO5 (empuxo vertical × γf, "
+    "pesos e reação de serviço × 1,0). Os esforços nunca ficam abaixo dos da planilha.",
     "Momento da ponta com talão (modo 'Máximo'): além das pressões na base, vale o equilíbrio do nó — momento "
     "da cortina menos o do talão. A planilha só leva o momento da cortina à ponta quando não há talão.",
     "Ancoragem na base sob a ponta: a força das estacas não é descontada do momento nem do cortante da ponta "

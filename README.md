@@ -68,7 +68,7 @@ core/                   BACKEND — não importa streamlit
 ui/                     inputs · painel · graficos · armacao (desenho das armaduras) · estudo_solo · estado
 io_/                    projeto (JSON) · excel (importar/exportar) · memorial (PDF) · sondagem (ler PDF)
 tools/                  gerar_campos.py · gerar_cenarios.py
-tests/                  199 testes
+tests/                  200 testes
 ROTEIRO_IA.md           contexto, decisões e pendências para quem (ou qual IA) for continuar o projeto
 ```
 
@@ -127,10 +127,11 @@ print(r.fase1.verif.R_FSt, r.fase1.verif.R_FSd, r.atende_estabilidade, r.dim.ate
 - **Cargas em faixa, em linha e concentrada** no terrapleno (`core/boussinesq.py`): pressões de
   Boussinesq na forma de Terzaghi/NAVFAC, com opção de parede rígida (×2, padrão) ou que se desloca.
   Nove campos só do aplicativo (`sc_fx_*`, `sc_ln_*`, `sc_pt_*`, `sc_bq`). Não existem na planilha.
-- **Dimensionamento da base**: pior caso de todas as combinações em que cada grupo de ações (empuxo;
-  pesos, ancoragem e resistências; água) entra com 1,0 ou γf (NBR 8681), mais as combinações locais com a
-  reação do solo de serviço × 1,0 ou γf. Vale para ponta, talão, base entre contrafortes na frente e para
-  a verificação com descolamento. A planilha usa só γf × esforços de serviço.
+- **Dimensionamento da base**: pior caso entre as combinações em equilíbrio (cada grupo de ações — empuxo;
+  pesos, ancoragem e resistências; água — em 1,0 ou γf, NBR 8681) e a combinação local do GEO5 (empuxo
+  vertical × γf, pesos e reação do solo de serviço × 1,0). O campo `comb_base` permite adotar todas as
+  combinações locais (mais severo). Uma nota no dimensionamento mostra os esforços dos três conjuntos.
+  A planilha usa só γf × esforços de serviço.
 - **Equilíbrio do nó cortina-sapata**: no modo "Máximo", o momento da ponta é no mínimo o da cortina menos
   o do talão (a planilha só faz isso quando não há talão).
 - **Ancoragem sob a ponta**: a força das estacas não é descontada do momento nem do cortante da
@@ -141,7 +142,7 @@ print(r.fase1.verif.R_FSt, r.fase1.verif.R_FSd, r.atende_estabilidade, r.dim.ate
   com armadura nas duas direções. Os coeficientes do GEO5 da planilha ficam como opção legada.
 - **Blocos de coroamento**: face do bloco alinhada ao tardoz por padrão (a planilha centra o bloco
   nas estacas); o projetista pode escolher "centrado nas estacas" ou informar a posição.
-- Doze campos existem só no aplicativo (`bl_pos`, `bl_x`, `laje_cf` e os nove `sc_*`). Para reproduzir a planilha,
+- Treze campos existem só no aplicativo (`bl_pos`, `bl_x`, `laje_cf`, `comb_base` e os nove `sc_*`). Para reproduzir a planilha,
   use `core.planilha.MODO_PLANILHA` — é o que os testes de paridade fazem.
 - Comparações de limite com tolerância 1e-9.
 
