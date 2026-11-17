@@ -93,7 +93,7 @@ core/                   BACKEND — não importa streamlit
 ui/                     inputs · painel · graficos · armacao (desenho das armaduras) · estudo_solo · estado
 io_/                    projeto (JSON) · excel (importar/exportar) · memorial (PDF) · sondagem (ler PDF)
 tools/                  gerar_campos.py · gerar_cenarios.py
-tests/                  212 testes
+tests/                  216 testes
 ROTEIRO_IA.md           contexto, decisões e pendências para quem (ou qual IA) for continuar o projeto
 ```
 
@@ -178,6 +178,28 @@ print(r.fase1.verif.R_FSt, r.fase1.verif.R_FSd, r.atende_estabilidade, r.dim.ate
 - `TEXT(B_base,"0.00")` no cabeçalho do Resumo mostra "B = 003 m" em Excel pt-BR.
 - Listas de validação com vírgula dentro da opção (`0,6·fctd·b·d (GEO5)`, `0,45 (NBR 6118)`,
   `0,259 (GEO5)`) ficam quebradas no menu suspenso.
+
+Os três estão corrigidos na Revisão 01 (abaixo).
+
+## Revisão 01 da planilha
+
+`Verificacao_Muro_Arrimo_NBR11682_Rev01.xlsx` é a planilha atualizada com as alterações feitas no
+aplicativo até 17/11/2026: padrões de deslizamento e de solo na frente, cargas em faixa, linha e ponto
+(aba `Boussinesq`), combinações de ações da base (aba `Combinações`), equilíbrio do nó, faixa de
+excentricidade até B/4, ancoragem que não alivia a ponta, solo da frente com 1,0 na cortina, bloco
+alinhado ao tardoz, verificações adicionais e as correções acima. A lista completa está na aba
+`Notas` da própria revisão.
+
+- É gerada por `tools/revisar_planilha.py` a partir da original, que **não muda** (continua sendo a
+  referência dos testes de paridade). Para regerar: `.venv/bin/python tools/revisar_planilha.py`.
+- `tools/conferir_revisao.py` recalcula a revisão no LibreOffice (que reproduz o Excel célula a
+  célula na original) e compara ~417 valores por cenário com o aplicativo, em 92 cenários: os 75 da
+  paridade, os quatro memoriais do GEO5 e os das novidades. O aplicativo roda com a laje entre
+  contrafortes pelos coeficientes do GEO5, que é o que a planilha faz.
+- Fica só no aplicativo: laje com borda livre por elementos finitos, concreto acima de C40, força
+  mínima de travamento exata e as verificações de descolamento com tensão retangular.
+- O resultado final do dimensionamento passou a ser `Dimensionamento!O47` (nome `dm_atende`); a
+  linha 33 mantém as 26 verificações da original.
 
 ## Limitações
 

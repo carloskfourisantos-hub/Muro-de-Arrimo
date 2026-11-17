@@ -5,7 +5,7 @@ Leia-o inteiro antes de mexer em qualquer coisa. O estado técnico detalhado est
 [README.md](README.md); o plano original, em [PLANEJAMENTO.md](PLANEJAMENTO.md) (histórico — não é
 mais a referência).
 
-Situação em 16/11/2026: aplicativo completo e funcionando, **212 testes passando**.
+Situação em 16/11/2026: aplicativo completo e funcionando, **216 testes passando**.
 
 ---
 
@@ -44,6 +44,7 @@ concreto armado (ABNT NBR 11682) e dimensionamento estrutural (ABNT NBR 6118), p
 | 17/11/2026 | Combinações locais: **padrão = critério do GEO5** (empuxo vertical × γf; pesos e reação × 1,0); "todas as locais" virou opção (`comb_base`); nota sempre mostra equilíbrio, GEO5 e todas |
 | 17/11/2026 | **Versão desktop** = o mesmo aplicativo numa janela própria (`desktop/`: lançador com pywebview + receita do PyInstaller); não reescrever a interface em outra tecnologia |
 | 17/11/2026 | **Versão Android** = interface própria para celular + o mesmo `core/` rodando no aparelho com Pyodide (`android/`); APK pelo GitHub Actions. Nada de reescrever fórmulas em outra linguagem |
+| 17/11/2026 | **Planilha Revisão 01** gerada por `tools/revisar_planilha.py`; a original fica intacta como referência da paridade. Toda alteração nova no núcleo deve ir também para o script da revisão e passar em `tools/conferir_revisao.py` |
 
 Regra derivada: todo novo desvio em relação à planilha tem de ser (a) registrado em
 `core/premissas.py` (`DIFERENCAS_DA_PLANILHA`), (b) descrito no README e (c) coberto por teste.
@@ -79,11 +80,11 @@ core/             campos.py (GERADO) · enums.py · models.py · geometria.py ·
                   solver.py · planilha.py · placa.py · perfil.py · solos.py · premissas.py
 ui/               estado.py · inputs.py · painel.py · graficos.py · armacao.py · estudo_solo.py · formato.py
 io_/              projeto.py (JSON) · excel.py · memorial.py (PDF) · sondagem.py (leitura do PDF de SPT)
-tools/            gerar_campos.py · gerar_cenarios.py
+tools/            gerar_campos.py · gerar_cenarios.py · revisar_planilha.py (gera a Rev. 01) · conferir_revisao.py (Rev. 01 × núcleo, LibreOffice)
 android/          ponte.py (núcleo ↔ JSON) · src/ (interface para celular) · montar.py · LEIAME.md
 desktop/          muro_desktop.py (lançador) · muro_desktop.spec (PyInstaller) · gerar_executavel.bat ·
                   Abrir Muro de Arrimo.bat · requirements-desktop.txt
-tests/            10 arquivos, 212 testes; tests/data/cenarios.json é a referência do Excel
+tests/            11 arquivos, 216 testes; tests/data/cenarios.json é a referência do Excel
 ```
 
 Cadeia de cálculo (funções puras, sem iteração):
@@ -150,6 +151,9 @@ aplicativo abre em `http://localhost:8501`.
 - Consequência: **se a planilha mudar, a referência não pode ser regerada na nuvem.** Peça ao
   projetista para rodar o gerador no Windows e enviar o novo `cenarios.json`.
 - `pywin32` já está restrito ao Windows no `requirements.txt`.
+- O LibreOffice (`soffice`) está disponível na nuvem e reproduz o Excel célula a célula na planilha
+  original (11.171 células conferidas em 17/11/2026). Serve para recalcular e conferir planilhas
+  (é o que `tools/conferir_revisao.py` usa), mas não substitui o `cenarios.json` gerado no Excel.
 
 ## 7. Onde o aplicativo difere da planilha (deliberado)
 
@@ -254,7 +258,7 @@ Proponha antes de fazer; a decisão é do projetista.
    ou **entrada/saída** (`io_/`).
 2. Se envolver a planilha, releia as células envolvidas com `openpyxl` (fórmulas e valores) antes
    de escrever código.
-3. Rode `pytest` antes de começar, para confirmar os 212 testes verdes.
+3. Rode `pytest` antes de começar, para confirmar os 216 testes verdes.
 4. Faça a mudança no núcleo primeiro, com teste; só depois a interface.
 5. Se o resultado passar a diferir da planilha, pare e classifique: erro de porte (corrija) ou
    desvio deliberado (registre em `premissas.py`, no README e como exceção nomeada na paridade).

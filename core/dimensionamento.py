@@ -646,8 +646,8 @@ def calcular_dimensionamento(e, g: Geometria, f1, f2) -> Dimensionamento:
                      "na forma de Terzaghi/NAVFAC), horizontais, somadas ao empuxo de terra e majoradas por γf. "
                      "Resultante na estabilidade: " + f"{conc.Fh:.1f}".replace(".", ",") + " kN/m a "
                      + f"{conc.zF:.2f}".replace(".", ",") + " m do fundo da sapata."
-                     + (" As pressões dessas cargas NÃO entram nas lajes entre contrafortes nem no contraforte: "
-                        "verifique-os à parte." if cf else ""))
+                     + (" Essas pressões entram no contraforte, mas NÃO nas lajes entre contrafortes: verifique as lajes "
+                        "à parte." if cf else ""))
     fora = lambda f: f.forcas.F_N > 0 and abs(f.verif.R_e) >= B / 2   # noqa: E731
     base_invalida = fora(f1) or (trav and fora(f2))
     if fav_fora and not base_invalida:
