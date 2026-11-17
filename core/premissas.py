@@ -60,6 +60,8 @@ PREMISSAS: dict[str, list[str]] = {
         "Capacidade de carga: Vesic, sapata corrida, com B', fatores de inclinação e sem fatores de "
         "profundidade; FS = qult / σef ≥ 3,0.",
         "Qualquer aviso de consistência dos dados leva o resultado a 'NÃO ATENDE', como na planilha.",
+        "Ferramentas (base mínima, menor valor): procuram a excentricidade dentro do limite; a faixa até B/4 não "
+        "conta como solução.",
     ],
     "Dimensionamento (ABNT NBR 6118)": [
         "Cortina em balanço engastada no topo da sapata, esforços em 21 seções. Caso A = muro livre (empuxo em "

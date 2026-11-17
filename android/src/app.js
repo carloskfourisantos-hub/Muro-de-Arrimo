@@ -364,17 +364,30 @@ function aplicarSolo(onde) {
 }
 
 /* ------------------------------------------------------------------ projeto */
-function baixar(nome, texto, tipo) {
+const nativo = () => !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+
+/* Entrega um arquivo ao usuário. No navegador: download. No APK: grava e abre o "Compartilhar" do Android
+   (salvar em Arquivos, enviar por WhatsApp, e-mail…), porque a WebView não faz download de arquivo gerado. */
+async function entregar(nome, texto, tipo) {
+  if (nativo()) {
+    const { Filesystem, Share } = window.Capacitor.Plugins;
+    const r = await Filesystem.writeFile({ path: nome, data: texto, directory: "CACHE", encoding: "utf8" });
+    await Share.share({ title: nome, files: [r.uri] });
+    return "compartilhado";
+  }
   const a = el("a", { href: URL.createObjectURL(new Blob([texto], { type: tipo })), download: nome });
   document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  return "baixado";
 }
-function salvarProjeto() {
-  const m = meta();
-  const projeto = { formato: "muro-arrimo", versao: 1, salvo_em: new Date().toISOString().slice(0, 19), ...m, entrada: dados };
-  const nome = (m.nome || "muro").normalize("NFD").replace(/[^\w\- ]/g, "").trim().replace(/\s+/g, "_") || "muro";
-  baixar(nome + ".json", JSON.stringify(projeto, null, 2), "application/json");
-  $("#proj-msg").textContent = "Projeto salvo na pasta de downloads. O mesmo arquivo abre no aplicativo de computador.";
+const nomeDeArquivo = () => ((meta().nome || "muro").normalize("NFD").replace(/[^\w\- ]/g, "").trim().replace(/\s+/g, "_") || "muro");
+async function salvarProjeto() {
+  const projeto = { formato: "muro-arrimo", versao: 1, salvo_em: new Date().toISOString().slice(0, 19), ...meta(), entrada: dados };
+  try {
+    const como = await entregar(nomeDeArquivo() + ".json", JSON.stringify(projeto, null, 2), "application/json");
+    $("#proj-msg").textContent = (como === "baixado" ? "Projeto salvo na pasta de downloads." : "Projeto pronto para salvar ou enviar.")
+      + " O mesmo arquivo abre no aplicativo de computador.";
+  } catch (erro) { $("#proj-msg").textContent = "Não foi possível salvar: " + erro.message; }
 }
 async function abrirProjeto(arquivo) {
   try {
@@ -407,10 +420,85 @@ async function compartilhar() {
   const texto = resumo();
   if (!texto) return;
   try {
-    if (navigator.share) await navigator.share({ title: "Muro de arrimo", text: texto });
+    if (nativo()) await window.Capacitor.Plugins.Share.share({ title: "Muro de arrimo", text: texto });
+    else if (navigator.share) await navigator.share({ title: "Muro de arrimo", text: texto });
     else { await navigator.clipboard.writeText(texto); $("#proj-msg").textContent = "Resumo copiado."; }
   } catch (_) { /* compartilhamento cancelado */ }
 }
+/* ------------------------------------------------------------------ ferramentas */
+async function menorBase() {
+  const msg = $("#fer-base-msg");
+  msg.textContent = "Procurando a menor base… pode levar alguns segundos.";
+  const r = await chamar("base_minima_json", dados).catch((e) => ({ ok: false, texto: e.message }));
+  msg.textContent = r.texto;
+  if (r.ok) { Object.assign(dados, r.campos); guardar(); pintar(); recalcular(); }
+}
+async function sugerirArmaduras() {
+  const msg = $("#fer-arm-msg");
+  msg.replaceChildren(el("p", { class: "fraco", text: "Calculando as armaduras…" }));
+  const r = await chamar("sugerir_armaduras_json", dados).catch((e) => ({ ok: false, texto: e.message }));
+  const linhas = (r.linhas || []).map((l) => el("div", { class: "check" + (l.atende ? "" : " nok") },
+    el("div", { class: "n", text: l.posicao }), el("div", { class: "d", text: l.texto + (l.atende ? "" : "  ·  ✖ não atende") })));
+  msg.replaceChildren(el("p", { class: "fraco", text: r.texto }), ...linhas);
+  if (r.ok) { Object.assign(dados, r.campos); guardar(); pintar(); recalcular(); }
+}
+
+/* ------------------------------------------------------------------ memorial (HTML para imprimir em PDF) */
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function valorDoCampo(c, v) {
+  if (v === null) return `igual a “${c.vinculo_rotulo}”`;
+  if (c.tipo === "bool") return v ? "Sim" : "Não";
+  if (typeof v === "number") return String(Math.round(v * 1e4) / 1e4).replace(".", ",") + (c.unidade ? " " + c.unidade : "");
+  return String(v);
+}
+async function memorial() {
+  if (!ultimo) return;
+  const r = ultimo, m = meta();
+  const prem = await chamar("premissas_json", {});
+  const desab = await chamar("desabilitados_json", dados);
+  const tab = (cab, linhas) => `<table><tr>${cab.map((h) => `<th>${esc(h)}</th>`).join("")}</tr>${linhas.map((l) =>
+    `<tr>${l.map((x) => `<td>${esc(x)}</td>`).join("")}</tr>`).join("")}</table>`;
+  const sit = (ok) => (ok ? "ATENDE" : "NÃO ATENDE");
+  const svg = croqui(r.croqui).outerHTML.replace(/var\(--tinta2\)/g, "#555").replace(/var\(--tinta\)/g, "#111");
+  let h = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memorial — ${esc(m.nome || "Muro de arrimo")}</title><style>
+body{font:13px/1.45 system-ui,Arial,sans-serif;color:#111;max-width:820px;margin:24px auto;padding:0 16px}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 6px;border-bottom:1px solid #999;padding-bottom:3px}
+h3{font-size:13px;margin:14px 0 4px}table{border-collapse:collapse;width:100%;margin:6px 0}
+th,td{border:1px solid #bbb;padding:3px 6px;text-align:left;vertical-align:top}th{background:#eee}
+.v{font-weight:700;padding:6px 8px;border:1px solid #111;margin:4px 0}.fraco{color:#555}svg{max-width:520px;display:block}
+li{margin:3px 0}@media print{body{margin:0}h2{break-after:avoid}table,svg{break-inside:avoid}}</style></head><body>
+<h1>Memorial de cálculo — muro de arrimo de flexão</h1>
+<p class="fraco">${esc([m.nome, m.obra, m.autor].filter(Boolean).join(" · "))}<br>ABNT NBR 11682 (estabilidade) e ABNT NBR 6118 (dimensionamento), por metro linear ·
+gerado em ${new Date().toLocaleDateString("pt-BR")} · versão __VERSAO__</p>
+<div class="v">Estabilidade externa (NBR 11682): ${sit(r.estab)}</div><div class="v">Dimensionamento estrutural (NBR 6118): ${sit(r.dim)}</div>
+${tab(["Verificação", "Valor", "Limite", "Situação"], r.cartoes.map((c) => [c.t, c.v, c.lim, c.ok ? "OK" : "NÃO OK"]))}
+${r.avisos.map((a) => `<p><b>Aviso (Fase ${a.fase}):</b> ${esc(a.texto)}</p>`).join("")}
+${r.legadas.length ? `<p><b>Opções legadas (compatibilidade GEO5) ativas:</b> ${esc(r.legadas.join("; "))}</p>` : ""}
+<h2>Croqui</h2>${svg}<h2>Dados de entrada</h2>`;
+  for (const s of esquema.secoes) {
+    const linhas = s.campos.filter((c) => !desab.includes(c.nome)).map((c) => [c.rotulo, valorDoCampo(c, dados[c.nome])]);
+    if (linhas.length) h += `<h3>${esc(s.titulo)}</h3>${tab(["Dado", "Valor"], linhas)}`;
+  }
+  h += `<h2>Verificações de estabilidade</h2>${tab(["Verificação", ...r.fases.map((n) => "Fase " + n), "Limite", "Situação"],
+    r.verif.map((l) => [l.rot + (l.un ? ` (${l.un})` : ""), ...l.vals, l.lim, l.ok === null ? "" : l.ok ? "OK" : "NÃO OK"]))}`;
+  for (const f of r.forcas) {
+    h += `<h3>Forças — Fase ${f.fase}</h3>${tab(["Força", "Fx (kN/m)", "Fz (kN/m)", "x (m)", "z (m)", "M estab. (kN·m/m)", "M tomb. (kN·m/m)"],
+      [...f.linhas.map((l) => [l.nome, l.Fx, l.Fz, l.x, l.z, l.Mres, l.Movr]), ["TOTAIS", f.total.Fx, f.total.Fz, "", "", f.total.Mres, f.total.Movr]])}`;
+  }
+  h += `<h2>Dimensionamento estrutural</h2>${tab(["Elemento", "Verificação", "Solicitante", "Resistente", "Un.", "Situação"],
+    r.checks.map((c) => [c.grupo, c.nome, c.sol, c.res, c.un, c.sit]))}
+<h3>Notas</h3><ul>${r.notas.map((n) => `<li>${esc(n)}</li>`).join("")}</ul><h2>Premissas</h2>`;
+  for (const [tema, itens] of Object.entries(prem.premissas)) h += `<h3>${esc(tema)}</h3><ul>${itens.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>`;
+  h += `<h3>Diferenças em relação à planilha de origem</h3><ul>${prem.diferencas.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>
+<p class="fraco">Estabilidade global do talude não verificada. Este memorial não dispensa a conferência do engenheiro responsável.</p></body></html>`;
+  try {
+    const como = await entregar("Memorial_" + nomeDeArquivo() + ".html", h, "text/html");
+    $("#proj-msg").textContent = como === "baixado" ? "Memorial salvo na pasta de downloads. Abra-o e use Imprimir → Salvar como PDF."
+      : "Memorial pronto. Abra-o no navegador e use Imprimir → Salvar como PDF.";
+  } catch (erro) { $("#proj-msg").textContent = "Não foi possível gerar o memorial: " + erro.message; }
+}
+
 function padroes() {
   const d = {};
   for (const c of Object.values(campos)) d[c.nome] = c.padrao;
@@ -451,6 +539,9 @@ $("#proj-salvar").addEventListener("click", salvarProjeto);
 $("#proj-abrir").addEventListener("click", () => $("#proj-arquivo").click());
 $("#proj-arquivo").addEventListener("change", (ev) => { if (ev.target.files[0]) abrirProjeto(ev.target.files[0]); ev.target.value = ""; });
 $("#proj-resumo").addEventListener("click", compartilhar);
+$("#proj-memorial").addEventListener("click", memorial);
+$("#fer-base").addEventListener("click", menorBase);
+$("#fer-arm").addEventListener("click", sugerirArmaduras);
 $("#proj-padrao").addEventListener("click", () => {
   if (!confirm("Restaurar todos os dados para os valores padrão? Os dados atuais serão perdidos.")) return;
   dados = padroes(); guardar(); pintar(); recalcular();

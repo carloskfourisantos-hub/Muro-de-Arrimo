@@ -14,8 +14,14 @@ ESPACAMENTOS = (20.0, 17.5, 15.0, 12.5, 10.0, 7.5)
 
 
 def estabilidade_ok(r: Resultado) -> bool:
-    """As 4 verificações da NBR 11682 em todas as fases (sem considerar avisos)."""
-    return r.fase1.verif.verificacoes_ok and (not r.tem_fase2 or r.fase2.verif.verificacoes_ok)
+    """As 4 verificações da NBR 11682 em todas as fases (sem considerar avisos).
+
+    As ferramentas buscam a excentricidade dentro do limite: a faixa até B/4, que só é aceita com a base
+    verificada para o descolamento, não conta como solução.
+    """
+    def ok(v) -> bool:
+        return v.ok_tomb and v.ok_desl and v.ok_exc and v.ok_cap
+    return ok(r.fase1.verif) and (not r.tem_fase2 or ok(r.fase2.verif))
 
 
 # ----------------------------------------------------------------- geometria

@@ -29,6 +29,9 @@
   <section id="aba-dados" class="aba">
     <p class="fraco">Por metro linear. Origem na aresta inferior da ponta; x para o aterro, z para cima.</p>
     <div id="form-dados"></div>
+    <h2>Ferramenta</h2>
+    <div class="botoes"><button id="fer-base">Encontrar a menor base (ponta + talão)</button></div>
+    <p id="fer-base-msg" class="fraco" role="status"></p>
   </section>
 
   <section id="aba-resultado" class="aba" hidden>
@@ -47,6 +50,8 @@
     <div id="veredito-dim"></div>
     <h2>Materiais e armaduras adotadas</h2>
     <div id="form-estrutural"></div>
+    <div class="botoes"><button id="fer-arm">Sugerir armaduras (menor área de aço que atende)</button></div>
+    <div id="fer-arm-msg" role="status"></div>
     <h2>Verificações do dimensionamento</h2>
     <div id="checks"></div>
     <details open><summary>Notas</summary><ul id="notas" class="notas"></ul></details>
@@ -73,15 +78,16 @@
     <div class="botoes">
       <button id="proj-salvar">Salvar projeto (.json)</button>
       <button id="proj-abrir">Abrir projeto</button>
+      <button id="proj-memorial">Memorial de cálculo (.html)</button>
       <button id="proj-resumo">Compartilhar resumo</button>
       <button id="proj-padrao" class="perigo">Restaurar valores padrão</button>
     </div>
     <input id="proj-arquivo" type="file" accept=".json,application/json" hidden>
-    <p id="proj-msg" class="fraco"></p>
+    <p id="proj-msg" class="fraco" role="status"></p>
     <h2>Sobre</h2>
     <p class="fraco">Mesmo núcleo de cálculo do aplicativo de computador, rodando neste aparelho. O arquivo de
-      projeto (.json) é o mesmo nos dois. Não fazem parte desta versão: leitura de sondagem em PDF, memorial em
-      PDF, exportação para Excel e o desenho das armaduras.</p>
+      projeto (.json) é o mesmo nos dois. O memorial sai em HTML: abra-o no navegador e use Imprimir → Salvar como PDF.
+      Não fazem parte desta versão: leitura de sondagem em PDF, exportação para Excel e o desenho das armaduras.</p>
     <p class="fraco">Estabilidade global do talude não é verificada. Os resultados não dispensam a conferência do
       engenheiro responsável.</p>
     <p class="fraco" id="versao"></p>

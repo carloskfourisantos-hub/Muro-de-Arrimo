@@ -239,3 +239,55 @@ def desabilitados_json(texto: str) -> str:
     base = json.loads(Entrada().model_dump_json())
     base.update({k: v for k, v in d.items() if k in CAMPO})
     return json.dumps([c.nome for c in CAMPOS if not habilitado(c.nome, base)])
+
+
+# ------------------------------------------------------------------ ferramentas
+def _entrada(texto: str) -> Entrada:
+    d = json.loads(texto)
+    return Entrada(**{k: v for k, v in d.items() if k in CAMPO})
+
+
+def base_minima_json(texto: str) -> str:
+    """Menor ponta + talão que atende a estabilidade (mesma busca do aplicativo de computador)."""
+    from core.solver import base_minima
+    try:
+        b = base_minima(_entrada(texto))
+    except Exception as exc:
+        return json.dumps(dict(ok=False, texto=f"Não foi possível calcular: {exc}"), ensure_ascii=False)
+    if not b.encontrado:
+        return json.dumps(dict(ok=False, texto="Nenhuma combinação de ponta e talão dentro dos limites da busca "
+                                               "atende a estabilidade. Reveja a altura, o solo ou use estacas."),
+                          ensure_ascii=False)
+    res = b.resultado
+    texto = (f"Menor base que atende a estabilidade: ponta {num(b.b_ponta)} m e talão {num(b.b_talao)} m "
+             f"(B = {num(res.geo.B_base)} m).")
+    fases = [res.fase1] + ([res.fase2] if res.tem_fase2 else [])
+    avisos = list(dict.fromkeys(a.texto for f in fases for a in f.avisos))
+    if avisos:
+        texto += " Atenção — aviso que mantém o resultado como NÃO ATENDE: " + "; ".join(avisos) + "."
+    if not res.dim.atende:
+        texto += " A armadura atual não atende a essa geometria: use “Sugerir armaduras” na aba Armaduras."
+    return json.dumps(dict(ok=True, campos=dict(b_ponta=round(b.b_ponta, 2), b_talao=round(b.b_talao, 2)),
+                           texto=texto), ensure_ascii=False)
+
+
+def sugerir_armaduras_json(texto: str) -> str:
+    """Bitola e espaçamento mais econômicos que atendem cada posição de armadura."""
+    from core.solver import sugerir_armaduras
+    try:
+        nova, sug = sugerir_armaduras(_entrada(texto))
+    except Exception as exc:
+        return json.dumps(dict(ok=False, texto=f"Não foi possível calcular: {exc}"), ensure_ascii=False)
+    campos, linhas = {}, []
+    for s in sug:
+        campos[s.campo_phi], campos[s.campo_s] = s.phi, s.s
+        linhas.append(dict(posicao=s.posicao, texto=f"ϕ {num(s.phi, 1)} c/ {num(s.s, 1)} cm", atende=s.atende))
+    return json.dumps(dict(ok=True, campos=campos, linhas=linhas,
+                           texto="Armaduras sugeridas aplicadas." if all(s.atende for s in sug) else
+                                 "Algumas posições não têm armadura que atenda: aumente a espessura da peça."),
+                      ensure_ascii=False)
+
+
+def premissas_json(_texto: str = "") -> str:
+    from core.premissas import DIFERENCAS_DA_PLANILHA, PREMISSAS
+    return json.dumps(dict(premissas=PREMISSAS, diferencas=DIFERENCAS_DA_PLANILHA), ensure_ascii=False)

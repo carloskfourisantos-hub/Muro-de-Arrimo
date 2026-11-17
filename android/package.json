@@ -8,6 +8,8 @@
     "servir": "python -m http.server 8600 --directory www"
   },
   "dependencies": {
+    "@capacitor/filesystem": "^7.0.0",
+    "@capacitor/share": "^7.0.0",
     "pyodide": "314.0.8"
   },
   "devDependencies": {

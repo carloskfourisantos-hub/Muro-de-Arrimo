@@ -46,6 +46,7 @@ jobs:
         run: |
           npx cap add android
           npx cap sync android
+          python montar.py --icones android/app/src/main/res
 
       - name: Gerar o APK
         working-directory: android/android
@@ -63,3 +64,35 @@ jobs:
         with:
           name: MuroDeArrimo-web
           path: android/www
+
+  emulador:
+    name: Teste no emulador Android
+    needs: apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: MuroDeArrimo-apk
+          path: apk
+      - name: Habilitar aceleração (KVM)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Instalar, abrir e conferir o resultado na tela
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          script: bash android/teste_emulador.sh apk/app-debug.apk saida-emulador
+      - name: Guardar a tela e os registros
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: MuroDeArrimo-teste-emulador
+          path: saida-emulador

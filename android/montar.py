@@ -65,6 +65,38 @@ def _icone(tamanho: int, destino: Path) -> None:
     plt.close(fig)
 
 
+def icones_android(res: Path) -> None:
+    """Troca o ícone padrão do Capacitor pelo do aplicativo (rodar depois de ``npx cap add android``)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Polygon
+
+    def desenho(tamanho: int, destino: Path, margem: float, fundo: bool) -> None:
+        fig = plt.figure(figsize=(1, 1), dpi=tamanho)
+        ax = fig.add_axes([0, 0, 1, 1])
+        ax.set_xlim(-margem, 10 + margem)        # margem > 0 encolhe o desenho (zona segura do ícone adaptável)
+        ax.set_ylim(-margem, 10 + margem)
+        ax.axis("off")
+        ax.add_patch(Polygon([(5.3, 3.2), (8.2, 3.2), (8.2, 7.4), (5.3, 7.4)], color="#d9c7a0"))
+        ax.add_patch(Polygon([(2.2, 2.2), (8.2, 2.2), (8.2, 3.2), (5.3, 3.2), (5.0, 7.8), (4.3, 7.8), (4.0, 3.2),
+                              (2.2, 3.2)], color="#ffffff"))
+        fig.savefig(destino, facecolor="#1f5fae" if fundo else "none", transparent=not fundo)
+        plt.close(fig)
+
+    for dens, lado in (("mdpi", 48), ("hdpi", 72), ("xhdpi", 96), ("xxhdpi", 144), ("xxxhdpi", 192)):
+        pasta = res / f"mipmap-{dens}"
+        pasta.mkdir(parents=True, exist_ok=True)
+        desenho(lado, pasta / "ic_launcher.png", 0.0, True)
+        desenho(lado, pasta / "ic_launcher_round.png", 1.2, True)
+        desenho(round(lado * 108 / 48), pasta / "ic_launcher_foreground.png", 4.0, False)
+    (res / "values").mkdir(parents=True, exist_ok=True)
+    (res / "values" / "ic_launcher_background.xml").write_text(
+        '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">#1F5FAE</color>\n'
+        "</resources>\n", encoding="utf-8")
+    print(f"ícones gravados em {res}")
+
+
 def montar() -> Path:
     if not (PYODIDE / "pyodide.mjs").exists():
         sys.exit("Falta o Pyodide: rode 'npm install' dentro da pasta android antes de montar.")
@@ -118,4 +150,7 @@ def montar() -> Path:
 
 
 if __name__ == "__main__":
-    montar()
+    if len(sys.argv) == 3 and sys.argv[1] == "--icones":
+        icones_android(Path(sys.argv[2]))
+    else:
+        montar()

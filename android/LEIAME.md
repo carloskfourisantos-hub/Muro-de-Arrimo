@@ -7,14 +7,18 @@ aparelho com o [Pyodide](https://pyodide.org) (Python em WebAssembly). Nenhuma f
 
 ## O que tem
 
-- **Dados**: as seções 1 a 9 da entrada, com os mesmos rótulos, limites, padrões e textos de ajuda.
+- **Dados**: as seções 1 a 9 da entrada, com os mesmos rótulos, limites, padrões e textos de ajuda, e a
+  ferramenta que encontra a menor base (ponta + talão).
 - **Resultado**: vereditos, os quatro fatores, avisos, croqui, tabela de verificações e tabela de forças.
-- **Armaduras**: materiais, bitolas e espaçamentos, verificações da NBR 6118 e notas do dimensionamento.
+- **Armaduras**: materiais, bitolas e espaçamentos, sugestão automática de armaduras, verificações da
+  NBR 6118 e notas do dimensionamento.
 - **Solo**: parâmetros por tipo de solo e NSPT, com botão para aplicar ao aterro ou à fundação.
-- **Projeto**: salvar e abrir o arquivo `.json` (o mesmo do aplicativo de computador), compartilhar o resumo.
+- **Projeto**: salvar e abrir o arquivo `.json` (o mesmo do aplicativo de computador), memorial de cálculo
+  em HTML (abra no navegador e use Imprimir → Salvar como PDF) e compartilhar o resumo. No APK os arquivos
+  saem pelo "Compartilhar" do Android (salvar em Arquivos, WhatsApp, e-mail).
 
-Ficaram de fora desta versão: leitura de sondagem em PDF, memorial em PDF, exportação para Excel, desenho
-das armaduras e as ferramentas (base mínima, estudo paramétrico).
+Ficaram de fora desta versão: leitura de sondagem em PDF, exportação para Excel, desenho das armaduras e
+o estudo paramétrico.
 
 ## Como obter o APK
 
@@ -24,6 +28,9 @@ O repositório tem um fluxo automático (`.github/workflows/android.yml`). A cad
 1. No GitHub, abra a aba **Actions** e a execução mais recente de **Aplicativo Android**.
 2. Em **Artifacts**, baixe **MuroDeArrimo-apk** e extraia o `app-debug.apk`.
 3. Copie o APK para o celular e abra-o. O Android pede para permitir a instalação de fonte desconhecida.
+
+O fluxo também instala o APK num emulador Android e confere se o resultado do cálculo aparece na tela
+(trabalho "Teste no emulador Android"; a captura de tela fica no artefato **MuroDeArrimo-teste-emulador**).
 
 É um APK de depuração, assinado com a chave padrão de testes: serve para instalar direto no aparelho, não
 para publicar na Play Store.
@@ -53,4 +60,5 @@ Abra `http://localhost:8600` no navegador (no Chrome, F12 e o modo de celular).
 | `src/` | Interface (`index.html`, `app.js`, `estilo.css`), motor em segundo plano (`motor.js`), uso offline (`sw.js`) |
 | `montar.py` | Monta `www/`: interface, `programa.zip` (núcleo + ponte), Pyodide, numpy, pydantic e ícones |
 | `capacitor.config.json` | Empacotamento em APK com o Capacitor |
+| `teste_emulador.sh` | Teste do APK no emulador (GitHub Actions) |
 | `../tests/test_android.py` | Testes da ponte |

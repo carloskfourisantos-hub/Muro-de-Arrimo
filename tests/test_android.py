@@ -73,3 +73,17 @@ def test_montagem_empacota_o_nucleo_inteiro():
     import importlib
     for mod in ("core.fases", "core.solos", "core.campos", "core.enums", "core.models"):
         assert not any(dep in importlib.import_module(mod).__dict__ for dep in ("streamlit", "matplotlib", "pandas"))
+
+
+def test_ferramentas_da_ponte():
+    b = json.loads(ponte.base_minima_json(json.dumps(dict(b_talao=0.8, modo_cunha="Vertical"))))
+    assert b["ok"] and set(b["campos"]) == {"b_ponta", "b_talao"} and "Menor base" in b["texto"]
+    v = calcular(Entrada(modo_cunha="Vertical", **b["campos"])).fase1.verif
+    assert v.ok_tomb and v.ok_desl and v.ok_exc and v.ok_cap          # excentricidade dentro do limite, sem a faixa
+    com_aviso = json.loads(ponte.base_minima_json(json.dumps(dict(b_talao=0.8))))
+    assert "Atenção — aviso" in com_aviso["texto"]                   # avisa o que mantém o NÃO ATENDE
+    a = json.loads(ponte.sugerir_armaduras_json(json.dumps(dict(ar_tz_phi=8, ar_tz_s=20))))
+    assert a["ok"] and len(a["linhas"]) == 4 and all(l["atende"] for l in a["linhas"])
+    assert calcular(Entrada(**a["campos"])).dim.atende
+    p = json.loads(ponte.premissas_json())
+    assert "Modelo" in p["premissas"] and len(p["diferencas"]) > 5
