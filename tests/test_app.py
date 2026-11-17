@@ -113,3 +113,13 @@ def test_solos_aplica_parametros():
     botao.click().run()
     assert not at.exception
     assert at.session_state["dados"]["phi_f"] == 32.0
+
+
+def test_lancador_desktop_sobe_o_servidor():
+    """desktop/muro_desktop.py --teste: sobe o Streamlit numa porta livre, confere a resposta e encerra."""
+    import subprocess
+    import sys
+    r = subprocess.run([sys.executable, str(RAIZ / "desktop" / "muro_desktop.py"), "--teste"],
+                       capture_output=True, text=True, timeout=180)
+    assert r.returncode == 0, r.stderr[-2000:]
+    assert "servidor OK" in r.stdout and "HTTP 200" in r.stdout

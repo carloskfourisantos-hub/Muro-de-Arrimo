@@ -13,3 +13,7 @@ site/
 
 # arquivos temporários do Excel
 ~$*
+
+# versão desktop: saída do PyInstaller
+build/
+dist/

@@ -19,6 +19,24 @@ python -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
 ```
 
+## Versão para desktop
+
+O mesmo aplicativo abre numa janela própria, sem terminal: a pasta `desktop/` traz um lançador que sobe o
+servidor escondido neste computador (só em 127.0.0.1) e mostra a interface numa janela. Não há segunda
+versão do código — núcleo e páginas são os mesmos.
+
+- **Sem instalar nada além do Python**: dê dois cliques em `desktop\Abrir Muro de Arrimo.bat`. Na primeira
+  vez ele cria o ambiente e instala as dependências (alguns minutos); depois abre direto.
+- **Executável**: rode `desktop\gerar_executavel.bat` no Windows. Sai em `dist\MuroDeArrimo\MuroDeArrimo.exe`
+  (cerca de 600 MB com as bibliotecas). Para usar em outro computador, copie a pasta `dist\MuroDeArrimo`
+  inteira; lá não é preciso ter Python.
+- A janela usa o `pywebview` (WebView2, que já vem no Windows 10/11). Sem ele, ou com `--navegador`, o
+  aplicativo abre no navegador padrão.
+- `python desktop/muro_desktop.py --teste` sobe o servidor, confere a resposta e encerra.
+
+O PyInstaller não gera `.exe` a partir do Linux: a receita (`desktop/muro_desktop.spec`) foi validada com um
+build no Linux, com as quatro páginas abrindo dentro do executável; o `.exe` precisa ser gerado no Windows.
+
 ## Páginas
 
 | Página | O que faz |
@@ -68,7 +86,7 @@ core/                   BACKEND — não importa streamlit
 ui/                     inputs · painel · graficos · armacao (desenho das armaduras) · estudo_solo · estado
 io_/                    projeto (JSON) · excel (importar/exportar) · memorial (PDF) · sondagem (ler PDF)
 tools/                  gerar_campos.py · gerar_cenarios.py
-tests/                  200 testes
+tests/                  201 testes
 ROTEIRO_IA.md           contexto, decisões e pendências para quem (ou qual IA) for continuar o projeto
 ```
 
