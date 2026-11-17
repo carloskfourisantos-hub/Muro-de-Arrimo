@@ -37,6 +37,13 @@ versão do código — núcleo e páginas são os mesmos.
 O PyInstaller não gera `.exe` a partir do Linux: a receita (`desktop/muro_desktop.spec`) foi validada com um
 build no Linux, com as quatro páginas abrindo dentro do executável; o `.exe` precisa ser gerado no Windows.
 
+## Versão para Android
+
+A pasta `android/` traz um aplicativo para celular que roda o **mesmo núcleo** (`core/`) dentro do aparelho,
+com o Pyodide (Python em WebAssembly): sem servidor e sem internet depois de instalado. O APK é gerado
+automaticamente pelo GitHub (aba Actions → "Aplicativo Android" → Artifacts). Detalhes, o que ficou de fora
+e como instalar: [android/LEIAME.md](android/LEIAME.md).
+
 ## Páginas
 
 | Página | O que faz |
@@ -86,7 +93,7 @@ core/                   BACKEND — não importa streamlit
 ui/                     inputs · painel · graficos · armacao (desenho das armaduras) · estudo_solo · estado
 io_/                    projeto (JSON) · excel (importar/exportar) · memorial (PDF) · sondagem (ler PDF)
 tools/                  gerar_campos.py · gerar_cenarios.py
-tests/                  201 testes
+tests/                  211 testes
 ROTEIRO_IA.md           contexto, decisões e pendências para quem (ou qual IA) for continuar o projeto
 ```
 

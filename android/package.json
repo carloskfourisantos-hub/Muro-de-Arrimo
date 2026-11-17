@@ -1,0 +1,18 @@
+{
+  "name": "muro-de-arrimo-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aplicativo Android (PWA + Capacitor) do muro de arrimo: o núcleo Python roda no aparelho com o Pyodide.",
+  "scripts": {
+    "montar": "python montar.py",
+    "servir": "python -m http.server 8600 --directory www"
+  },
+  "dependencies": {
+    "pyodide": "314.0.8"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  }
+}

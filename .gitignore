@@ -17,3 +17,9 @@ site/
 # versão desktop: saída do PyInstaller
 build/
 dist/
+
+# aplicativo Android: dependências e saída da montagem
+android/node_modules/
+android/www/
+android/.cache/
+android/android/

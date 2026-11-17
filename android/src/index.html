@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f5fae">
+<title>Muro de arrimo</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-192.png">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<header>
+  <div>
+    <h1>Muro de arrimo</h1>
+    <p id="subtitulo">NBR 11682 · NBR 6118</p>
+  </div>
+  <span id="estado" class="estado">iniciando…</span>
+</header>
+
+<div id="carregando">
+  <div class="giro"></div>
+  <p id="msg-carga">Carregando o motor de cálculo…</p>
+  <p class="fraco">Na primeira vez leva alguns segundos. Depois funciona sem internet.</p>
+</div>
+
+<main hidden>
+  <section id="aba-dados" class="aba">
+    <p class="fraco">Por metro linear. Origem na aresta inferior da ponta; x para o aterro, z para cima.</p>
+    <div id="form-dados"></div>
+  </section>
+
+  <section id="aba-resultado" class="aba" hidden>
+    <div id="erros"></div>
+    <div id="vereditos"></div>
+    <div id="cartoes" class="cartoes"></div>
+    <div id="avisos"></div>
+    <h2>Croqui</h2>
+    <div id="croqui" class="croqui"></div>
+    <h2>Verificações</h2>
+    <div class="rolagem"><table id="tab-verif"></table></div>
+    <details><summary>Tabela de forças</summary><div id="forcas"></div></details>
+  </section>
+
+  <section id="aba-armaduras" class="aba" hidden>
+    <div id="veredito-dim"></div>
+    <h2>Materiais e armaduras adotadas</h2>
+    <div id="form-estrutural"></div>
+    <h2>Verificações do dimensionamento</h2>
+    <div id="checks"></div>
+    <details open><summary>Notas</summary><ul id="notas" class="notas"></ul></details>
+  </section>
+
+  <section id="aba-solo" class="aba" hidden>
+    <p class="fraco">Faixas de literatura por NSPT, para anteprojeto. Não substituem sondagem e ensaios.</p>
+    <label class="campo"><span>Tipo de solo</span><select id="solo-tipo"></select></label>
+    <label class="campo"><span>NSPT</span><input id="solo-nspt" type="number" inputmode="decimal" value="12" min="0" max="80"></label>
+    <label class="campo"><span>Posição na faixa (0 = conservador, 1 = limite superior)</span>
+      <input id="solo-postura" type="range" min="0" max="1" step="0.05" value="0"></label>
+    <label class="chave"><input id="solo-nd" type="checkbox"><span>Não drenado (argila: φu = 0 e c = Su)</span></label>
+    <div id="solo-saida"></div>
+    <div class="botoes">
+      <button id="solo-aterro">Aplicar ao aterro</button>
+      <button id="solo-fund">Aplicar à fundação</button>
+    </div>
+  </section>
+
+  <section id="aba-projeto" class="aba" hidden>
+    <label class="campo"><span>Identificação do muro</span><input id="proj-nome" type="text" placeholder="Muro M1"></label>
+    <label class="campo"><span>Obra</span><input id="proj-obra" type="text"></label>
+    <label class="campo"><span>Responsável</span><input id="proj-autor" type="text"></label>
+    <div class="botoes">
+      <button id="proj-salvar">Salvar projeto (.json)</button>
+      <button id="proj-abrir">Abrir projeto</button>
+      <button id="proj-resumo">Compartilhar resumo</button>
+      <button id="proj-padrao" class="perigo">Restaurar valores padrão</button>
+    </div>
+    <input id="proj-arquivo" type="file" accept=".json,application/json" hidden>
+    <p id="proj-msg" class="fraco"></p>
+    <h2>Sobre</h2>
+    <p class="fraco">Mesmo núcleo de cálculo do aplicativo de computador, rodando neste aparelho. O arquivo de
+      projeto (.json) é o mesmo nos dois. Não fazem parte desta versão: leitura de sondagem em PDF, memorial em
+      PDF, exportação para Excel e o desenho das armaduras.</p>
+    <p class="fraco">Estabilidade global do talude não é verificada. Os resultados não dispensam a conferência do
+      engenheiro responsável.</p>
+    <p class="fraco" id="versao"></p>
+  </section>
+</main>
+
+<nav hidden>
+  <button data-aba="dados" class="ativa">Dados</button>
+  <button data-aba="resultado">Resultado</button>
+  <button data-aba="armaduras">Armaduras</button>
+  <button data-aba="solo">Solo</button>
+  <button data-aba="projeto">Projeto</button>
+</nav>
+<script src="app.js"></script>
+</body>
+</html>

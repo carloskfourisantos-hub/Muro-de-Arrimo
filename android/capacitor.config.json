@@ -1,0 +1,6 @@
+{
+  "appId": "br.eng.muroarrimo",
+  "appName": "Muro de arrimo",
+  "webDir": "www",
+  "android": { "allowMixedContent": false }
+}

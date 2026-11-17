@@ -1,0 +1,16 @@
+{
+  "name": "Muro de arrimo — NBR 11682 / NBR 6118",
+  "short_name": "Muro de arrimo",
+  "description": "Verificação de estabilidade e dimensionamento de muro de arrimo de flexão, por metro linear.",
+  "lang": "pt-BR",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f6f5f1",
+  "theme_color": "#1f5fae",
+  "icons": [
+    { "src": "icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
