@@ -5,7 +5,7 @@ Leia-o inteiro antes de mexer em qualquer coisa. O estado técnico detalhado est
 [README.md](README.md); o plano original, em [PLANEJAMENTO.md](PLANEJAMENTO.md) (histórico — não é
 mais a referência).
 
-Situação em 16/11/2026: aplicativo completo e funcionando, **216 testes passando**.
+Situação em 16/11/2026: aplicativo completo e funcionando, **221 testes passando**.
 
 ---
 
@@ -84,7 +84,7 @@ tools/            gerar_campos.py · gerar_cenarios.py · revisar_planilha.py (g
 android/          ponte.py (núcleo ↔ JSON) · src/ (interface para celular) · montar.py · LEIAME.md
 desktop/          muro_desktop.py (lançador) · muro_desktop.spec (PyInstaller) · gerar_executavel.bat ·
                   Abrir Muro de Arrimo.bat · requirements-desktop.txt
-tests/            11 arquivos, 216 testes; tests/data/cenarios.json é a referência do Excel
+tests/            12 arquivos, 221 testes; tests/data/cenarios.json é a referência do Excel
 ```
 
 Cadeia de cálculo (funções puras, sem iteração):
@@ -258,7 +258,7 @@ Proponha antes de fazer; a decisão é do projetista.
    ou **entrada/saída** (`io_/`).
 2. Se envolver a planilha, releia as células envolvidas com `openpyxl` (fórmulas e valores) antes
    de escrever código.
-3. Rode `pytest` antes de começar, para confirmar os 216 testes verdes.
+3. Rode `pytest` antes de começar, para confirmar os 221 testes verdes.
 4. Faça a mudança no núcleo primeiro, com teste; só depois a interface.
 5. Se o resultado passar a diferir da planilha, pare e classifique: erro de porte (corrija) ou
    desvio deliberado (registre em `premissas.py`, no README e como exceção nomeada na paridade).

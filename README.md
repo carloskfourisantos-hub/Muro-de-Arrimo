@@ -93,7 +93,7 @@ core/                   BACKEND — não importa streamlit
 ui/                     inputs · painel · graficos · armacao (desenho das armaduras) · estudo_solo · estado
 io_/                    projeto (JSON) · excel (importar/exportar) · memorial (PDF) · sondagem (ler PDF)
 tools/                  gerar_campos.py · gerar_cenarios.py
-tests/                  216 testes
+tests/                  221 testes
 ROTEIRO_IA.md           contexto, decisões e pendências para quem (ou qual IA) for continuar o projeto
 ```
 
@@ -200,6 +200,8 @@ alinhado ao tardoz, verificações adicionais e as correções acima. A lista co
   mínima de travamento exata e as verificações de descolamento com tensão retangular.
 - O resultado final do dimensionamento passou a ser `Dimensionamento!O47` (nome `dm_atende`); a
   linha 33 mantém as 26 verificações da original.
+- Os quatro memoriais do GEO5 rodados na revisão estão em `exemplos/` (`tools/geo5_na_planilha.py`
+  gera os arquivos e a comparação; `tests/test_revisao_geo5.py` confere).
 
 ## Limitações
 
